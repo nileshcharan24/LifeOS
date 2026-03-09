@@ -507,7 +507,7 @@ Here's the full context you need for the LifeOS project:
 *   **Gamification:** Life is a series of quests. Habits = XP. XP = Permission to indulge (e.g., social media time, snacks, spending).
 *   **Dual-State Privacy:** The app operates in two modes:
     *   **Normal Mode:** Public / casual use, showing aggregated or non-sensitive data.
-    *   **Deep Mode:** Sensitive tracking (sobriety, mental health, private journals). Data in this mode must be hidden, redacted, or aggregated in Normal Mode. Logs, analytics, and error messages must *never* leak Deep Mode details.
+    *   **Deep Mode:** Sensitive tracking (sobriety, mental health, private journals). Data in this mode must be hidden, redacted, or aggregated in Normal Mode. Logs, analytics, and error messages must *never* leak Deep Mode details. To enter deep mode, user must enter password.
 *   **AI Oracle:** An in-app AI guide that is constructive, firm, and analytical. It uses RAG to analyze journals, health data, and habit scores. Its tone and behavior are modifiable but should generally be firm but constructive, providing specific positive reinforcement and actionable next steps.
 *   **Holistic Tracking:** Academic attendance, fitness, and "Comfort Zone" challenges.
 *   **Vibe Coding:** The user wants to build fast with AI agents while understanding the underlying "why."
@@ -597,7 +597,7 @@ The in-app AI responses must be:
 *   **Firm but constructive.**
 *   Provide **constructive criticism** plus **specific positive reinforcement.**
 *   Action-oriented (clear next steps, micro-quests, or habit tweaks).
-*   **Personalized:** For the user (who is a soft person that learns with constructive criticism and positive reinforcement). The AI should find a middle ground, not too soft or too strict, and suggest improvements based on habits and results.
+*   **Personalized:** For the user (who is a soft person that learns with constructive criticism and positive reinforcement). The AI should find a middle ground, not too soft or too strict, and suggest improvements based on habits and results. But at the same time, the user needs a constant push to keep working.
 
 ---
 
