@@ -1,0 +1,14 @@
+---
+auto_attach:
+  - "src/services/**"
+  - "src/app/api/**"
+---
+
+## Security Rules (Auto-Attached)
+
+- Always **review and harden security** for new functionality:
+  - Add **rate limiting** based on both **IP** and **authenticated user** identity where applicable.
+  - Enforce **strict Zod validation** on all external inputs (forms, server actions, webhooks, Supabase payloads).
+  - **Never** hard-code secrets; **only** read API keys and secrets from environment variables.
+  - Design features to be **OWASP-aligned** (XSS, CSRF, injection, auth, access control, logging).
+- Prefer **server-side operations** (Server Components / Server Actions) over exposing sensitive logic to the client.

@@ -1,0 +1,12 @@
+# Exclude heavy meta-documentation from automatic indexing
+TRACKING/**
+!TRACKING/AllSteps.md
+!TRACKING/progress.md
+!TRACKING/structure.md
+!TRACKING/goals.md
+!TRACKING/errors.md
+!TRACKING/MEMEX.md
+.next/
+node_modules/
+dist/
+*.log

@@ -1,65 +1,54 @@
-## LifeOS Folder Structure (High-Level)
+## src/ Directory Structure (Feature-Based Architecture)
 
 ```text
-LifeOS/
-  .clinerules
-  .cursorrules
-  package.json
-  tsconfig.json
-  eslint.config.mjs
-  next.config.ts
-  postcss.config.mjs
-  public/
-    ...
-  src/
-    app/
-      layout.tsx
-      page.tsx
-      globals.css
-      favicon.ico
-    components/
-      layout/
-        Sidebar.tsx
-        Navbar.tsx
-        ModeToggle.tsx
-      dashboard/
-        QuestBoard.tsx
-        XPProgress.tsx
-        IndulgenceShop.tsx
-      ai/
-        OracleChat.tsx
-        DailySummary.tsx
-      memory/
-        MemoryLaneGallery.tsx
-        UploadButton.tsx
-      forms/
-        ReflectionForm.tsx
-        HealthLog.tsx
-    hooks/
-      useAuth.ts
-      usePoints.ts
-      useMode.ts
-      useLocalStorage.ts
-    lib/
-      supabase.ts
-      utils.ts
-      ai-orchestrator.ts
-    services/
-      habitService.ts
-      xpEngine.ts
-      aiService.ts
-    store/
-      PointsStore.ts
-      UIStore.ts
-    types/
-      database.types.ts
-      index.ts
-    schemas/
-      validation.ts
-  TRACKING/
-    progress.md
-    goals.md
-    structure.md
-    MEMEX.md
-```
-
+src/
+├── app/
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── components/
+│   ├── layout/
+│   │   ├── ModeToggle.tsx
+│   │   ├── Navbar.tsx
+│   │   └── Sidebar.tsx
+│   └── ui/
+├── context/
+│   └── ModeContext.tsx
+├── features/
+│   ├── ai/
+│   │   ├── DailySummary.tsx
+│   │   └── OracleChat.tsx
+│   ├── dashboard/
+│   │   ├── IndulgenceShop.tsx
+│   │   ├── QuestBoard.tsx
+│   │   └── XPProgress.tsx
+│   ├── forms/
+│   │   ├── HealthLog.tsx
+│   │   └── ReflectionForm.tsx
+│   └── memory/
+│       ├── MemoryLaneGallery.tsx
+│       └── UploadButton.tsx
+├── hooks/
+│   ├── useAuth.ts
+│   ├── useLocalStorage.ts
+│   ├── useMode.ts
+│   └── usePoints.ts
+├── lib/
+│   ├── supabase.ts
+│   ├── utils.ts
+│   └── ml/
+├── schemas/
+│   └── validation.ts
+├── services/
+│   ├── habitService.ts
+│   ├── xpEngine.ts
+│   └── ai/
+│       ├── aiService.ts
+│       └── orchestrator.ts
+├── store/
+│   ├── PointsStore.ts
+│   └── UIStore.ts
+└── types/
+    ├── database.types.ts
+    └── index.ts
