@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signUpAction } from "@/app/(auth)/actions";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -19,6 +20,7 @@ import Link from "next/link";
 export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   return (
     <div className="flex items-center justify-center min-h-screen">
@@ -41,11 +43,15 @@ export default function SignupPage() {
               const full_name = formData.get("full-name") as string;
               const usernameInput = formData.get("username") as string;
               const username = usernameInput || email.split("@")[0];
-              const result = await signUpAction({ email, password, full_name });
+              const result = await signUpAction({ email, password, full_name, username });
               if (result?.error) {
                 setError(result.error);
                 setLoading(false);
+                return;
               }
+
+              // Success: route to dashboard
+              router.push("/dashboard");
             }}
             className="grid gap-4"
           >

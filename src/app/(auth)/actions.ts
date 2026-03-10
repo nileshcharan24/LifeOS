@@ -27,6 +27,24 @@ export async function signUpAction(credentials: SignUpWithEmail & { username?: s
 
     const supabase = await createClient();
 
+    // Normalize username (fallback to email prefix) and ensure uniqueness before creating auth user
+    const normalizedUsername = credentials.username || credentials.email.split("@")[0];
+
+    const { data: existingUsername, error: usernameCheckError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", normalizedUsername)
+      .maybeSingle();
+
+    if (usernameCheckError) {
+      console.error("Error checking username availability:", usernameCheckError);
+      return { error: "Unable to verify username availability. Please try again." };
+    }
+
+    if (existingUsername?.id) {
+      return { error: "Username is already taken. Please choose a different one." };
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email: credentials.email,
       password: credentials.password,
@@ -34,7 +52,7 @@ export async function signUpAction(credentials: SignUpWithEmail & { username?: s
         data: {
           full_name: credentials.full_name,
           email: credentials.email,
-          username: credentials.username || credentials.email.split("@")[0],
+          username: normalizedUsername,
           // Leave AI instructions unset by default
         },
       },
@@ -47,22 +65,27 @@ export async function signUpAction(credentials: SignUpWithEmail & { username?: s
 
     const userId = data.user?.id;
 
-    // Manual fallback to ensure profile row is created if trigger fails
+    // Manual fallback to ensure profile row is created if trigger fails.
+    // Use upsert to avoid duplicate key errors if the trigger already created the row.
     if (userId) {
-      const { error: profileError } = await supabase.from("profiles").insert({
-        id: userId,
-        full_name: credentials.full_name,
-        email: credentials.email,
-        username: credentials.username || credentials.email.split("@")[0],
-      });
+      const { error: profileError } = await supabase.from("profiles").upsert(
+        {
+          id: userId,
+          full_name: credentials.full_name,
+          email: credentials.email,
+          username: normalizedUsername,
+        },
+        { onConflict: "id" }
+      );
 
       if (profileError) {
-        console.error("Error inserting profile fallback:", profileError);
+        console.error("Error upserting profile fallback:", profileError);
         return { error: profileError.message };
       }
     }
 
-    redirect("/dashboard");
+    // Instead of throwing a NextRedirect to the client invocation, return success
+    return { success: true };
   } catch (err) {
     console.error("Unexpected sign up error:", err);
     return {
