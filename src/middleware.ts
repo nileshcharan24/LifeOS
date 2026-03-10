@@ -56,9 +56,10 @@ export async function middleware(request: NextRequest) {
 
   const {
     data: { session },
+    error,
   } = await supabase.auth.getSession();
 
-  if (!session && request.nextUrl.pathname.startsWith("/dashboard")) {
+  if (!session && !error && request.nextUrl.pathname.startsWith("/dashboard")) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

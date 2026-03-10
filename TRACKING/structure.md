@@ -3,52 +3,36 @@
 ```text
 src/
 ├── app/
+│   ├── (auth)/
+│   │   ├── login/
+│   │   │   └── page.tsx
+│   │   ├── signup/
+│   │   │   └── page.tsx
+│   │   └── actions.ts
+│   ├── auth/
+│   │   └── confirm/
+│   │       └── page.tsx
+│   ├── dashboard/
+│   │   └── page.tsx
 │   ├── favicon.ico
 │   ├── globals.css
 │   ├── layout.tsx
 │   └── page.tsx
 ├── components/
 │   ├── layout/
-│   │   ├── ModeToggle.tsx
 │   │   ├── Navbar.tsx
-│   │   └── Sidebar.tsx
 │   └── ui/
+│   └── mode-toggle.tsx
 ├── context/
 │   └── ModeContext.tsx
-├── features/
-│   ├── ai/
-│   │   ├── DailySummary.tsx
-│   │   └── OracleChat.tsx
-│   ├── dashboard/
-│   │   ├── IndulgenceShop.tsx
-│   │   ├── QuestBoard.tsx
-│   │   └── XPProgress.tsx
-│   ├── forms/
-│   │   ├── HealthLog.tsx
-│   │   └── ReflectionForm.tsx
-│   └── memory/
-│       ├── MemoryLaneGallery.tsx
-│       └── UploadButton.tsx
-├── hooks/
-│   ├── useAuth.ts
-│   ├── useLocalStorage.ts
-│   ├── useMode.ts
-│   └── usePoints.ts
 ├── lib/
-│   ├── supabase.ts
-│   ├── utils.ts
-│   └── ml/
-├── schemas/
-│   └── validation.ts
+│   └── supabase/
+│       ├── client.ts
+│       └── server.ts
 ├── services/
-│   ├── habitService.ts
-│   ├── xpEngine.ts
-│   └── ai/
-│       ├── aiService.ts
-│       └── orchestrator.ts
-├── store/
-│   ├── PointsStore.ts
-│   └── UIStore.ts
+│   └── auth/
+│       ├── authService.ts
+│       └── authService.server.ts
 └── types/
-    ├── database.types.ts
-    └── index.ts
+    ├── auth.ts
+    └── database.types.ts
