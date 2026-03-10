@@ -286,55 +286,135 @@ This phase focuses on setting up your database (Supabase) and authentication.
     *   **Action:** In your Supabase project dashboard, navigate to the "SQL Editor." Create the following tables. We'll start with essential tables and add more as needed.
         *   **`profiles` table:** Stores user metadata.
             ```sql
+            /* ---------------------------------------------------------
+            1. PROFILES TABLE 
+            Extends Supabase Auth with LifeOS-specific metadata.
+            ---------------------------------------------------------
+            */
             create table public.profiles (
-              id uuid references auth.users not null primary key,
-              username text unique,
-              avatar_url text,
-              full_name text,
-              deep_mode boolean default false, -- New: Tracks user's deep mode preference
-              updated_at timestamp with time zone default now()
+            id uuid references auth.users on delete cascade not null primary key,
+            username text unique,
+            email text,
+            full_name text,
+            avatar_url text,
+            
+            -- Gamification Stats
+            total_xp integer default 0,
+            level integer default 1,
+            
+            -- LifeOS Logic & Privacy
+            deep_mode_active boolean default false,
+            -- Custom AI behavior instructions (Text-based for maximum personalization)
+            ai_custom_instructions text default 'I am a soft person who learns with constructive criticism and positive reinforcement. Be firm and critical of my mistakes, but find a middle ground. Suggest improvements in my life and track progress.',
+            
+            updated_at timestamp with time zone default now(),
+            created_at timestamp with time zone default now()
             );
-            alter table public.profiles enable row security;
-            create policy "Public profiles are viewable by everyone." on public.profiles for select using (true);
-            create policy "Users can insert their own profile." on public.profiles for insert with check (auth.uid() = id);
-            create policy "Users can update own profile." on public.profiles for update using (auth.uid() = id);
-            ```
-        *   **`quests` table (Main Habits):**
-            ```sql
+
+            -- Enable RLS
+            alter table public.profiles enable row level security;
+
+            -- Policies
+            create policy "Users can view own profile" on public.profiles for select using (auth.uid() = id);
+            create policy "Users can update own profile" on public.profiles for update using (auth.uid() = id);
+
+
+            /* ---------------------------------------------------------
+            2. QUESTS TABLE 
+            Recurring habits that build your core XP.
+            ---------------------------------------------------------
+            */
             create table public.quests (
-              id uuid default gen_random_uuid() primary key,
-              user_id uuid references public.profiles(id) on delete cascade not null,
-              name text not null,
-              description text,
-              xp_reward integer not null default 10,
-              frequency text not null default 'daily', -- 'daily', 'weekly', 'monthly'
-              last_completed_at timestamp with time zone,
-              is_active boolean default true,
-              created_at timestamp with time zone default now()
+            id uuid default gen_random_uuid() primary key,
+            user_id uuid references public.profiles(id) on delete cascade not null,
+            name text not null,
+            description text,
+            xp_reward integer not null default 10,
+            frequency text not null check (frequency in ('daily', 'weekly', 'monthly')),
+            
+            -- Privacy/Logic flags
+            is_private boolean default false, -- For Deep Mode filtering
+            is_active boolean default true,
+            last_completed_at timestamp with time zone,
+            created_at timestamp with time zone default now()
             );
-            alter table public.quests enable row security;
-            create policy "User can view their own quests." on public.quests for select using (auth.uid() = user_id);
-            create policy "User can insert their own quests." on public.quests for insert with check (auth.uid() = user_id);
-            create policy "User can update their own quests." on public.quests for update using (auth.uid() = user_id);
-            create policy "User can delete their own quests." on public.quests for delete using (auth.uid() = user_id);
-            ```
-        *   **`daily_tasks` table (Side-Quests/Daily To-Do):**
-            ```sql
+
+            -- Enable RLS
+            alter table public.quests enable row level security;
+
+            -- Policies
+            create policy "Users manage own quests" on public.quests for all using (auth.uid() = user_id);
+
+
+            /* ---------------------------------------------------------
+            3. DAILY_TASKS TABLE 
+            One-off 'Side Quests' and daily to-do items.
+            ---------------------------------------------------------
+            */
             create table public.daily_tasks (
-              id uuid default gen_random_uuid() primary key,
-              user_id uuid references public.profiles(id) on delete cascade not null,
-              name text not null,
-              description text,
-              xp_reward integer default 5,
-              task_date date not null,
-              is_completed boolean default false,
-              created_at timestamp with time zone default now()
+            id uuid default gen_random_uuid() primary key,
+            user_id uuid references public.profiles(id) on delete cascade not null,
+            title text not null,
+            description text,
+            xp_reward integer default 5,
+            due_date date default current_date,
+            
+            -- Status flags
+            is_completed boolean default false,
+            is_assigned_by_ai boolean default false, -- Track if AI auto-scheduled this
+            created_at timestamp with time zone default now()
             );
-            alter table public.daily_tasks enable row security;
-            create policy "User can view their own daily tasks." on public.daily_tasks for select using (auth.uid() = user_id);
-            create policy "User can insert their own daily tasks." on public.daily_tasks for insert with check (auth.uid() = user_id);
-            create policy "User can update their own daily tasks." on public.daily_tasks for update using (auth.uid() = user_id);
-            create policy "User can delete their own daily tasks." on public.daily_tasks for delete using (auth.uid() = user_id);
+
+            -- Enable RLS
+            alter table public.daily_tasks enable row level security;
+
+            -- Policies
+            create policy "Users manage own tasks" on public.daily_tasks for all using (auth.uid() = user_id);
+
+
+            /* ---------------------------------------------------------
+            4. INDULGENCES TABLE 
+            The 'Shop' where you spend earned XP.
+            ---------------------------------------------------------
+            */
+            create table public.indulgences (
+            id uuid default gen_random_uuid() primary key,
+            user_id uuid references public.profiles(id) on delete cascade not null,
+            name text not null,
+            xp_cost integer not null,
+            category text check (category in ('entertainment', 'food', 'spending', 'other')),
+            created_at timestamp with time zone default now()
+            );
+
+            -- Enable RLS
+            alter table public.indulgences enable row level security;
+
+            -- Policies
+            create policy "Users manage own shop" on public.indulgences for all using (auth.uid() = user_id);
+
+
+            /* ---------------------------------------------------------
+            5. AUTOMATED PROFILE TRIGGER
+            Automatically creates a Profile row when a user signs up.
+            ---------------------------------------------------------
+            */
+            create or replace function public.handle_new_user()
+            returns trigger as $$
+            begin
+            insert into public.profiles (id, email, full_name, avatar_url)
+            values (
+                new.id, 
+                new.email, 
+                new.raw_user_meta_data->>'full_name', 
+                new.raw_user_meta_data->>'avatar_url'
+            );
+            return new;
+            end;
+            $$ language plpgsql security definer;
+
+            create trigger on_auth_user_created
+            after insert on auth.users
+            for each row execute procedure public.handle_new_user();
             ```
     *   **AI Help:** "How to design a database schema for a habit tracker."
 *   **1.1.3. Configure Supabase Environment Variables in Next.js:**
@@ -613,4 +693,4 @@ With this context, you are ready to assist the user in building LifeOS step-by-s
 ```
 
 ### 8. Tracking Your Progress
-*Whenever a step is finished, mark it [x] and run the "Sync Memex" command.*
+*Whenever a step is finished, mark it [x] and run the "Sync Memex" command. Commit changes and push to github with relevant commit message* 
