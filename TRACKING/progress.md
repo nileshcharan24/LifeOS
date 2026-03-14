@@ -1,8 +1,17 @@
 # LifeOS Progress
-- [x] Phase 0: Professional Scaffolding & Industrial Refactor
-- [x] Phase 1: Git Initialization & Remote Linking
-- [x] Phase 0: Refactor & Efficiency Setup
-- [x] Phase 2: Database Schema & Auth Setup
-  - [x] 2.1: Database Schema
-  - [x] 2.2: Auth UI & Service Layer
-- [ ] Phase 3: Core Dashboard & Gamification
+
+### Phase 0: Setup & Infrastructure
+- [x] 0.2. Next.js Project Initialization
+- [x] 0.3. Project Structure Refinement & Core Files
+
+### Phase 1: Data & Security
+- [x] 1.1. Supabase Project Setup & Database Schema
+- [x] 1.2. User Authentication (Email/Password) & Protected Routes
+- [ ] 1.3. Privacy & Dual-State (Normal/Deep Mode)
+- [ ] 1.4. Client-Side Encryption Logic (for Deep Mode)
+
+### 4. Detailed Feature Breakdown & Implementation Strategy
+- [ ] A. The Economy (XP & Scoring)
+- [ ] B. Planning & Productivity
+- [ ] C. Reflection & Health
+- [ ] D. The AI Oracle (Your Companion)

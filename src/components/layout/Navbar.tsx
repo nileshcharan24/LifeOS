@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ModeToggle } from "@/components/mode-toggle";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { ModeToggle } from "@/components/layout/ModeToggle";
 
 export function Navbar() {
   return (
@@ -7,10 +8,11 @@ export function Navbar() {
       <div className="container flex h-14 max-w-screen-2xl items-center">
         <nav className="flex items-center space-x-4 lg:space-x-6">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <span className="font-bold">LifeOS</span>
+            <span className="text-2xl font-bold">LifeOS</span>
           </Link>
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-4">
+          <ThemeToggle />
           <ModeToggle />
         </div>
       </div>
