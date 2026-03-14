@@ -7,7 +7,7 @@
 ### Phase 1: Data & Security
 - [x] 1.1. Supabase Project Setup & Database Schema
 - [x] 1.2. User Authentication (Email/Password) & Protected Routes
-- [ ] 1.3. Privacy & Dual-State (Normal/Deep Mode)
+- [x] 1.3. Privacy & Dual-State (Normal/Deep Mode)
 - [ ] 1.4. Client-Side Encryption Logic (for Deep Mode)
 
 ### 4. Detailed Feature Breakdown & Implementation Strategy

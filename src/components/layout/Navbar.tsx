@@ -12,8 +12,8 @@ export function Navbar() {
           </Link>
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-4">
-          <ThemeToggle />
           <ModeToggle />
+                    <ThemeToggle />
         </div>
       </div>
     </header>
