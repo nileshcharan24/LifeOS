@@ -22,17 +22,33 @@ src/
 │   ├── layout/
 │   │   ├── Navbar.tsx
 │   └── ui/
+│   │   └── button.tsx
+│   │   └── (other shadcn components)
 │   └── mode-toggle.tsx
 ├── context/
 │   └── ModeContext.tsx
+├── features/
+│   ├── ai/
+│   │   └── OracleChat.tsx
+│   ├── journal/
+│   │   └── JournalEditor.tsx
 ├── lib/
+│   ├── utils/
+│   │   └── encryption.ts
 │   └── supabase/
 │       ├── client.ts
 │       └── server.ts
 ├── services/
+│   ├── ai/
+│   │   └── aiService.ts
+│   ├── economy/
+│   │   └── xpService.ts
+│   ├── journal/
+│   │   └── journalService.ts
 │   └── auth/
 │       ├── authService.ts
 │       └── authService.server.ts
 └── types/
     ├── auth.ts
     └── database.types.ts
+```

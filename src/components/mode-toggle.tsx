@@ -5,11 +5,11 @@ import { useMode } from "@/context/ModeContext";
 import { Button } from "@/components/ui/button";
 
 export function ModeToggle() {
-  const { mode, toggleMode } = useMode();
+  const { isDeepMode, toggleDeepMode } = useMode();
 
   return (
-    <Button variant="outline" size="icon" onClick={toggleMode}>
-      {mode === "Normal" ? "🌞" : "🌜"}
+    <Button variant="outline" size="icon" onClick={() => toggleDeepMode("1234")}>
+      {!isDeepMode ? "🌞" : "🌜"}
       <span className="sr-only">Toggle mode</span>
     </Button>
   );
