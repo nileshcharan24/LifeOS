@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 
-export function calculateLevel(totalXp: number) {
+export async function calculateLevel(totalXp: number) {
   return Math.floor(Math.sqrt(totalXp / 100)) + 1;
 }
 
@@ -33,7 +33,7 @@ export async function grantXP(amount: number, reason: string) {
 
   if (profile) {
     const newTotalXp = (profile.total_xp || 0) + amount;
-    const newLevel = calculateLevel(newTotalXp);
+    const newLevel = await calculateLevel(newTotalXp);
     
     const { error: updateError } = await supabase
       .from("profiles")

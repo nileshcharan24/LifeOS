@@ -19,7 +19,7 @@ export async function askOracle(message: string) {
 
   const { data: quests } = await supabase
     .from("quests")
-    .select("title, status")
+    .select("name, is_active")
     .eq("profile_id", user.id);
 
   const { data: latestJournal } = await supabase
@@ -32,8 +32,8 @@ export async function askOracle(message: string) {
 
   // Compile context
   const customInstructions = profile?.ai_custom_instructions || "You are a firm but constructive AI Oracle.";
-  const activeQuests = quests?.filter(q => q.status === "active").map(q => q.title).join(", ") || "None";
-  const completedQuests = quests?.filter(q => q.status === "completed").map(q => q.title).join(", ") || "None";
+  const activeQuests = quests?.filter(q => q.is_active === true).map(q => q.name).join(", ") || "None";
+  const completedQuests = quests?.filter(q => q.is_active === false).map(q => q.name).join(", ") || "None";
   
   const systemPrompt = `
     You are the LifeOS AI Oracle.

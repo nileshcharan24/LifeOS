@@ -22,23 +22,24 @@ import * as z from "zod";
 import { createQuest } from "@/services/productivity/questService";
 
 const formSchema = z.object({
-  title: z.string().min(1, "Title is required"),
+  name: z.string().min(1, "Name is required"),
   description: z.string().min(1, "Description is required"),
-  difficulty: z.enum(["Easy", "Medium", "Hard", "Epic"]),
+  frequency: z.enum(["daily", "weekly", "monthly"]),
 });
 
 export function CreateQuestModal() {
   const { control, handleSubmit, reset, formState: { errors } } = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      title: "",
+      name: "",
       description: "",
-      difficulty: "Easy",
+      frequency: "daily",
     }
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     await createQuest(values as any);
+    window.dispatchEvent(new CustomEvent("xp_updated"));
     reset();
   }
 
@@ -53,13 +54,13 @@ export function CreateQuestModal() {
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="text-sm font-medium">Title</label>
+            <label className="text-sm font-medium">Name</label>
             <Controller
               control={control}
-              name="title"
-              render={({ field }) => <Input placeholder="Quest title" {...field} />}
+              name="name"
+              render={({ field }) => <Input placeholder="Quest name" {...field} />}
             />
-            {errors.title && <p className="text-sm text-red-500">{errors.title.message}</p>}
+            {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
           </div>
 
           <div>
@@ -73,25 +74,24 @@ export function CreateQuestModal() {
           </div>
 
           <div>
-            <label className="text-sm font-medium">Difficulty</label>
+            <label className="text-sm font-medium">Frequency</label>
             <Controller
               control={control}
-              name="difficulty"
+              name="frequency"
               render={({ field }) => (
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a difficulty" />
+                    <SelectValue placeholder="Select frequency" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Easy">Easy</SelectItem>
-                    <SelectItem value="Medium">Medium</SelectItem>
-                    <SelectItem value="Hard">Hard</SelectItem>
-                    <SelectItem value="Epic">Epic</SelectItem>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
                   </SelectContent>
                 </Select>
               )}
             />
-            {errors.difficulty && <p className="text-sm text-red-500">{errors.difficulty.message}</p>}
+            {errors.frequency && <p className="text-sm text-red-500">{errors.frequency.message}</p>}
           </div>
 
           <Button type="submit">Submit</Button>

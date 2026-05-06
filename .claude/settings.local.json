@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const pkg = require\\('./package.json'\\); console.log\\(JSON.stringify\\(Object.keys\\({...pkg.dependencies,...pkg.devDependencies}\\), null, 2\\)\\)\")",
+      "Bash(npx tsc *)",
+      "Bash(node -e \"const fs = require\\('fs'\\); const raw = fs.readFileSync\\('src/types/database.types.ts', 'utf16le'\\); console.log\\(raw\\)\")",
+      "Bash(node -e \"const fs = require\\('fs'\\); const raw = fs.readFileSync\\('src/types/database.types.ts', 'utf16le'\\); const tables = raw.match\\(/^\\\\s{6}\\\\w+: \\\\{$/gm\\); console.log\\(tables\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"const fs = require\\('fs'\\); const raw = fs.readFileSync\\('src/types/database.types.ts', 'utf16le'\\); console.log\\(raw.slice\\(-3000\\)\\)\")",
+      "Bash(node -e \"const fs = require\\('fs'\\); const raw = fs.readFileSync\\('src/types/database.types.ts', 'utf16le'\\); const idx = raw.indexOf\\('Views:'\\); console.log\\(raw.slice\\(idx - 200, idx + 100\\)\\)\")",
+      "Bash(node -e \"const fs = require\\('fs'\\); const raw = fs.readFileSync\\('src/types/database.types.ts', 'utf16le'\\); const lines = raw.split\\('\\\\n'\\); lines.slice\\(438, 455\\).forEach\\(\\(l, i\\) => console.log\\(438+i, JSON.stringify\\(l\\)\\)\\)\")"
+    ]
+  }
+}

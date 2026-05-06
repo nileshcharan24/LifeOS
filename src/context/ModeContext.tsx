@@ -19,14 +19,14 @@ const storageKey = "lifeos-mode";
 
 export const ModeProvider = ({ children }: { children: ReactNode }) => {
   const [isDeepMode, setIsDeepMode] = useState(false);
-    const TEMP_PIN = "1234";
   
     const toggleDeepMode = (password: string) => {
       if (isDeepMode) {
         setIsDeepMode(false);
         return true;
       }
-      if (password === TEMP_PIN) {
+      const savedPin = typeof window !== "undefined" ? localStorage.getItem("deep_mode_pin") || "1234" : "1234";
+      if (password === savedPin) {
         setIsDeepMode(true);
         return true;
       }

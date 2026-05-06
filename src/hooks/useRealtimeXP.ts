@@ -33,6 +33,12 @@ export function useRealtimeXP() {
     }
     fetchInitialXP();
 
+    const handleXpUpdate = () => {
+      fetchInitialXP();
+    };
+
+    window.addEventListener("xp_updated", handleXpUpdate);
+
     const channel = supabase
       .channel("profiles")
       .on(
@@ -56,6 +62,7 @@ export function useRealtimeXP() {
       .subscribe();
 
     return () => {
+      window.removeEventListener("xp_updated", handleXpUpdate);
       supabase.removeChannel(channel);
     };
   }, [user, calculateLevel, level]);

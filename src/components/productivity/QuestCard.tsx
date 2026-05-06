@@ -9,29 +9,28 @@ export function QuestCard({ quest }: { quest: Quest }) {
   return (
     <div className="p-4 rounded-lg border border-border/40 bg-muted/40">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="font-semibold">{quest.title}</h3>
+        <h3 className="font-semibold">{quest.name}</h3>
         <Badge
           className={
-            quest.difficulty === "Easy"
+            quest.frequency === "daily"
               ? "bg-green-500"
-              : quest.difficulty === "Medium"
+              : quest.frequency === "weekly"
               ? "bg-yellow-500"
-              : quest.difficulty === "Hard"
-              ? "bg-red-500"
               : "bg-purple-500"
           }
         >
-          {quest.difficulty}
+          {quest.frequency}
         </Badge>
       </div>
       <p className="text-sm text-muted-foreground mb-4">{quest.description}</p>
       <Button
         onClick={async () => {
-          await completeQuest(quest.id, quest.xp_reward);
+          await completeQuest(quest.id, quest.xp_reward, quest.name);
+          window.dispatchEvent(new CustomEvent("xp_updated"));
         }}
-        disabled={quest.status === "completed"}
+        disabled={!quest.is_active}
       >
-        {quest.status === "completed" ? "Completed" : "Complete Quest"}
+        {!quest.is_active ? "Completed" : "Complete Quest"}
       </Button>
     </div>
   );

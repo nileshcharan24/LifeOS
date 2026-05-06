@@ -14,9 +14,9 @@ export async function fetchQuests() {
 }
 
 export async function createQuest(quest: {
-  title: string;
+  name: string;
   description: string;
-  difficulty: "Easy" | "Medium" | "Hard" | "Epic";
+  frequency: "daily" | "weekly" | "monthly";
 }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -25,17 +25,19 @@ export async function createQuest(quest: {
   }
 
   const xpMap = {
-    Easy: 50,
-    Medium: 100,
-    Hard: 200,
-    Epic: 500,
+    daily: 50,
+    weekly: 200,
+    monthly: 500,
   };
 
   const { error } = await supabase.from("quests").insert([
     {
-      ...quest,
+      name: quest.name,
+      description: quest.description,
+      frequency: quest.frequency,
       profile_id: user.id,
-      xp_reward: xpMap[quest.difficulty],
+      xp_reward: xpMap[quest.frequency as keyof typeof xpMap] || 50,
+      is_active: true
     },
   ]);
 
@@ -46,19 +48,19 @@ export async function createQuest(quest: {
   revalidatePath("/dashboard/quests");
 }
 
-export async function completeQuest(questId: number, xpReward: number) {
+export async function completeQuest(questId: string, xpReward: number, questName: string) {
   const supabase = await createClient();
 
   const { error: updateError } = await supabase
     .from("quests")
-    .update({ status: "completed" })
+    .update({ is_active: false, last_completed_at: new Date().toISOString() })
     .eq("id", questId);
 
   if (updateError) {
     throw updateError;
   }
 
-  await grantXP(xpReward, `Completed quest #${questId}`);
+  await grantXP(xpReward, `Quest: ${questName}`);
 
   revalidatePath("/dashboard/quests");
   revalidatePath("/dashboard");
