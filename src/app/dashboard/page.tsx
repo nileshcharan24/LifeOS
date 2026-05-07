@@ -17,7 +17,7 @@ import { HistoryCalendar } from "@/components/dashboard/HistoryCalendar";
 import { HabitGrid } from "@/components/dashboard/HabitGrid";
 import { PersonalPlanner } from "@/components/planner/PersonalPlanner";
 import { TaskTable } from "@/components/planner/TaskTable";
-import { AcademicTracker } from "@/components/planner/AcademicTracker";
+import { AcademicTracker } from "@/components/academic/AcademicTracker";
 
 export default function DashboardPage() {
   const { isDeepMode } = useMode();

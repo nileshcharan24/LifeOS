@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -370,7 +370,9 @@ export interface Database {
           name: string
           start_date: string | null
           end_date: string | null
+          status: "active" | "archived"
           created_at: string | null
+          updated_at: string | null
         }
         Insert: {
           id?: string
@@ -378,7 +380,9 @@ export interface Database {
           name: string
           start_date?: string | null
           end_date?: string | null
+          status?: "active" | "archived"
           created_at?: string | null
+          updated_at?: string | null
         }
         Update: {
           id?: string
@@ -386,7 +390,9 @@ export interface Database {
           name?: string
           start_date?: string | null
           end_date?: string | null
+          status?: "active" | "archived"
           created_at?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -397,129 +403,147 @@ export interface Database {
           }
         ]
       }
-      academic_subjects: {
+      courses: {
         Row: {
           id: string
+          semester_id: string
           profile_id: string
           name: string
-          target_percentage: number | null
-          semester_id: string | null
+          code: string | null
           credits: number | null
-          description: string | null
+          instructor_name: string | null
           created_at: string | null
+          updated_at: string | null
         }
         Insert: {
           id?: string
+          semester_id: string
           profile_id: string
           name: string
-          target_percentage?: number | null
-          semester_id?: string | null
+          code?: string | null
           credits?: number | null
-          description?: string | null
+          instructor_name?: string | null
           created_at?: string | null
+          updated_at?: string | null
         }
         Update: {
           id?: string
+          semester_id?: string
           profile_id?: string
           name?: string
-          target_percentage?: number | null
-          semester_id?: string | null
+          code?: string | null
           credits?: number | null
-          description?: string | null
+          instructor_name?: string | null
           created_at?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "academic_subjects_profile_id_fkey"
-            columns: ["profile_id"]
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "academic_subjects_semester_id_fkey"
+            foreignKeyName: "courses_semester_id_fkey"
             columns: ["semester_id"]
             referencedRelation: "semesters"
             referencedColumns: ["id"]
-          }
-        ]
-      }
-      attendance_records: {
-        Row: {
-          id: string
-          subject_id: string
-          profile_id: string
-          date: string
-          status: "present" | "absent" | "late"
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          subject_id: string
-          profile_id: string
-          date?: string
-          status: "present" | "absent" | "late"
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          subject_id?: string
-          profile_id?: string
-          date?: string
-          status?: "present" | "absent" | "late"
-          created_at?: string | null
-        }
-        Relationships: [
+          },
           {
-            foreignKeyName: "attendance_records_subject_id_fkey"
-            columns: ["subject_id"]
-            referencedRelation: "academic_subjects"
+            foreignKeyName: "courses_profile_id_fkey"
+            columns: ["profile_id"]
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           }
         ]
       }
-      course_assignments: {
+      class_instances: {
         Row: {
           id: string
-          subject_id: string
+          course_id: string
           profile_id: string
-          title: string
-          description: string | null
-          type: "assignment" | "exam" | "quiz"
-          due_date: string
-          is_completed: boolean
+          date: string
+          status: "attended" | "missed" | "od"
           created_at: string | null
+          updated_at: string | null
         }
         Insert: {
           id?: string
-          subject_id: string
+          course_id: string
           profile_id: string
-          title: string
-          description?: string | null
-          type?: "assignment" | "exam" | "quiz"
-          due_date: string
-          is_completed?: boolean
+          date: string
+          status?: "attended" | "missed" | "od"
           created_at?: string | null
+          updated_at?: string | null
         }
         Update: {
           id?: string
-          subject_id?: string
+          course_id?: string
           profile_id?: string
-          title?: string
-          description?: string | null
-          type?: "assignment" | "exam" | "quiz"
-          due_date?: string
-          is_completed?: boolean
+          date?: string
+          status?: "attended" | "missed" | "od"
           created_at?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "course_assignments_subject_id_fkey"
-            columns: ["subject_id"]
-            referencedRelation: "academic_subjects"
+            foreignKeyName: "class_instances_course_id_fkey"
+            columns: ["course_id"]
+            referencedRelation: "courses"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "course_assignments_profile_id_fkey"
+            foreignKeyName: "class_instances_profile_id_fkey"
+            columns: ["profile_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      assessments: {
+        Row: {
+          id: string
+          course_id: string
+          profile_id: string
+          name: string
+          type: "assignment" | "exam" | "quiz" | "project" | "presentation" | "participation" | "other"
+          due_date: string
+          status: "pending" | "submitted" | "completed"
+          completed_date: string | null
+          tags: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          course_id: string
+          profile_id: string
+          name: string
+          type?: "assignment" | "exam" | "quiz" | "project" | "presentation" | "participation" | "other"
+          due_date: string
+          status?: "pending" | "submitted" | "completed"
+          completed_date?: string | null
+          tags?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          course_id?: string
+          profile_id?: string
+          name?: string
+          type?: "assignment" | "exam" | "quiz" | "project" | "presentation" | "participation" | "other"
+          due_date?: string
+          status?: "pending" | "submitted" | "completed"
+          completed_date?: string | null
+          tags?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessments_course_id_fkey"
+            columns: ["course_id"]
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessments_profile_id_fkey"
             columns: ["profile_id"]
             referencedRelation: "profiles"
             referencedColumns: ["id"]
