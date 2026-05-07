@@ -11,7 +11,12 @@
       "Bash(node -e \"const fs = require\\('fs'\\); const raw = fs.readFileSync\\('src/types/database.types.ts', 'utf16le'\\); const lines = raw.split\\('\\\\n'\\); lines.slice\\(438, 455\\).forEach\\(\\(l, i\\) => console.log\\(438+i, JSON.stringify\\(l\\)\\)\\)\")",
       "Bash(python3 -c ' *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\niles\\\\LifeOS\\\\src\\\\services\\\\planner\" -File)",
+      "Bash(npm run *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\niles\\\\LifeOS\" -Force)",
+      "Bash(xargs grep -l \"askOracle\\\\|OracleChat\\\\|oracle\")",
+      "Bash(xargs grep -l \"route\\\\|api\")"
     ]
   }
 }
