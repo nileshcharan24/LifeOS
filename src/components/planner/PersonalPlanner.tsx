@@ -61,7 +61,7 @@ export function PersonalPlanner() {
   const [form, setForm] = useState({
     title: "",
     description: "",
-    deadline: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+    deadline: format(selectedDate, "yyyy-MM-dd") + "T12:00",
     priority: "medium" as TaskPriority,
     category: "",
   });
@@ -100,12 +100,13 @@ export function PersonalPlanner() {
       await createTask({
         title: form.title.trim(),
         description: form.description.trim() || undefined,
-        deadline: form.deadline || undefined,
+        // Convert local datetime string → UTC ISO so Supabase stores the right date
+        deadline: form.deadline ? new Date(form.deadline).toISOString() : undefined,
         priority: form.priority,
         category: form.category.trim() || undefined,
       });
       toast.success("Task created!");
-      setForm({ title: "", description: "", deadline: format(selectedDate, "yyyy-MM-dd'T'HH:mm"), priority: "medium", category: "" });
+      setForm({ title: "", description: "", deadline: format(selectedDate, "yyyy-MM-dd") + "T12:00", priority: "medium", category: "" });
       setOpen(false);
       await fetchTasks();
     } catch {
@@ -152,7 +153,10 @@ export function PersonalPlanner() {
             >
               <ChevronRight className="h-4 w-4" />
             </button>
-            <Dialog open={open} onOpenChange={setOpen}>
+            <Dialog open={open} onOpenChange={(v) => {
+              if (v) setForm((f) => ({ ...f, deadline: format(selectedDate, "yyyy-MM-dd") + "T12:00" }));
+              setOpen(v);
+            }}>
               <DialogTrigger asChild>
                 <Button size="sm">
                   <Plus className="h-4 w-4 mr-1" />

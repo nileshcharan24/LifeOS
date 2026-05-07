@@ -2,10 +2,14 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { grantXP } from "@/services/economy/xpService";
 import { updateDailyStreak } from "@/services/economy/xpService";
 
-export async function createJournalEntry(content: string, moodScore: number, isEncrypted: boolean) {
+export async function createJournalEntry(
+  content: string,
+  moodScore: number,
+  isEncrypted: boolean,
+  opts?: { moodTags?: string[]; energyLevel?: number; categoryTags?: string[] }
+) {
   const supabase = await createClient();
 
   const {
@@ -24,6 +28,9 @@ export async function createJournalEntry(content: string, moodScore: number, isE
         content,
         mood_score: moodScore,
         is_encrypted: isEncrypted,
+        mood_tags: opts?.moodTags ?? [],
+        energy_level: opts?.energyLevel ?? null,
+        category_tags: opts?.categoryTags ?? [],
       },
     ]);
 
@@ -31,10 +38,8 @@ export async function createJournalEntry(content: string, moodScore: number, isE
     throw new Error(error.message);
   }
 
-  // Grant 20 XP for journaling
-  await grantXP(20, "Daily Journal Entry");
-  
-  // Update Streak
+  // Journal entries give 0 XP (reflection only — per spec)
+  // Update streak only
   await updateDailyStreak(user.id);
 
   revalidatePath("/dashboard");

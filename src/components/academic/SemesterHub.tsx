@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { createSemester, getSemesters, deleteSemester, getSemesterStats } from "@/services/academic/academicService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
-import { GraduationCap, Plus, Trash2, ChevronRight, BookOpen, BarChart3, Calendar } from "lucide-react";
+import { GraduationCap, Plus, Trash2, ChevronRight, BookOpen, BarChart3 } from "lucide-react";
 
 type Semester = {
   id: string;
@@ -49,7 +48,6 @@ export function SemesterHub({ onSelectSemester }: { onSelectSemester: (id: strin
     setSemesters(data.filter(s => s.status === "active") as Semester[]);
     setLoading(false);
 
-    // Fetch stats for each semester
     const statsMap: Record<string, SemesterStats> = {};
     for (const sem of data) {
       const semStats = await getSemesterStats(sem.id);
@@ -137,13 +135,11 @@ export function SemesterHub({ onSelectSemester }: { onSelectSemester: (id: strin
             />
             <Input
               type="date"
-              placeholder="Start date"
               value={newSem.startDate}
               onChange={e => setNewSem(v => ({ ...v, startDate: e.target.value }))}
             />
             <Input
               type="date"
-              placeholder="End date"
               value={newSem.endDate}
               onChange={e => setNewSem(v => ({ ...v, endDate: e.target.value }))}
             />
@@ -177,10 +173,21 @@ export function SemesterHub({ onSelectSemester }: { onSelectSemester: (id: strin
               : "No dates set";
 
             return (
-              <button
+              // ── FIX: div instead of button to avoid nested <button> hydration error ──
+              // The entire card is clickable via onClick + keyboard handlers.
+              // The delete <button> inside is now a valid descendant of a div.
+              <div
                 key={sem.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => onSelectSemester(sem.id)}
-                className="group relative p-6 rounded-xl border border-border/40 bg-muted/30 hover:bg-muted/50 transition-colors text-left overflow-hidden"
+                onKeyDown={e => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectSemester(sem.id);
+                  }
+                }}
+                className="group relative p-6 rounded-xl border border-border/40 bg-muted/30 hover:bg-muted/50 transition-colors text-left overflow-hidden cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {/* Accent bar */}
                 <div className={`absolute top-0 left-0 w-1 h-full ${
@@ -194,13 +201,16 @@ export function SemesterHub({ onSelectSemester }: { onSelectSemester: (id: strin
                     <h3 className="text-lg font-semibold group-hover:text-primary transition-colors">{sem.name}</h3>
                     <p className="text-xs text-muted-foreground mt-0.5">{dateRange}</p>
                   </div>
+                  {/* ── valid <button> inside a div — no nesting violation ── */}
                   <button
+                    type="button"
                     onClick={e => {
                       e.stopPropagation();
                       handleDeleteSemester(sem.id, sem.name);
                     }}
                     disabled={deletingId === sem.id}
-                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1"
+                    aria-label={`Delete ${sem.name}`}
+                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </button>
@@ -268,7 +278,7 @@ export function SemesterHub({ onSelectSemester }: { onSelectSemester: (id: strin
                 <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>

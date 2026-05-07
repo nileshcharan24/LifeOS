@@ -191,6 +191,16 @@ export function CourseDetail({ courseId, onBack }: { courseId: string; onBack: (
     }
   };
 
+  const handleRevertAssessment = async (assessmentId: string) => {
+    try {
+      await updateAssessmentStatus(assessmentId, "pending");
+      toast.success("Reverted to pending.");
+      await fetchData();
+    } catch {
+      toast.error("Failed to revert assessment.");
+    }
+  };
+
   const handleDeleteAssessment = async (assessmentId: string) => {
     try {
       await deleteAssessment(assessmentId);
@@ -450,7 +460,7 @@ export function CourseDetail({ courseId, onBack }: { courseId: string; onBack: (
                       key={assessment.id}
                       className={`p-4 rounded-lg border ${
                         assessment.status === "completed"
-                          ? "border-border/40 bg-muted/30 opacity-60"
+                          ? "border-green-500/20 bg-green-500/5"
                           : isOverdue
                           ? "border-red-500/30 bg-red-500/10"
                           : "border-border/40 bg-background"
@@ -478,7 +488,14 @@ export function CourseDetail({ courseId, onBack }: { courseId: string; onBack: (
                           </div>
                         </div>
 
-                        {assessment.status !== "completed" && (
+                        {assessment.status === "completed" ? (
+                          <button
+                            onClick={() => handleRevertAssessment(assessment.id)}
+                            className="ml-2 px-3 py-1.5 text-xs font-medium rounded-md bg-muted border border-border/40 text-muted-foreground hover:bg-muted/80 transition-colors flex-shrink-0"
+                          >
+                            Revert
+                          </button>
+                        ) : (
                           <button
                             onClick={() => handleMarkAssessmentComplete(assessment.id)}
                             className="ml-2 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex-shrink-0"

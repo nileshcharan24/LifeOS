@@ -2,19 +2,32 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { spendXP } from "@/services/habitService";
+import { spendXPFromPool } from "@/services/economy/xpService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { ShoppingBag, Plus, Coins, Lock } from "lucide-react";
+import { ShoppingBag, Plus, Coins, Lock, AlertTriangle } from "lucide-react";
 import { useRealtimeXP } from "@/hooks/useRealtimeXP";
+import { XP_PER_LEVEL } from "@/lib/xp";
 
 type Indulgence = {
   id: string;
   name: string;
   xp_cost: number;
   category: string | null;
+  duration_label: string | null;
+  freq_limit_daily: number | null;
+  freq_limit_weekly: number | null;
+  enabled: boolean;
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -31,22 +44,20 @@ function categoryColor(cat: string | null) {
 }
 
 export function IndulgenceShop() {
-  const { totalXp } = useRealtimeXP();
+  const { totalXp, spendingPool } = useRealtimeXP();
   const [indulgences, setIndulgences] = useState<Indulgence[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newItem, setNewItem] = useState({ name: "", xp_cost: "", category: "" });
+  const [newItem, setNewItem] = useState({ name: "", xp_cost: "", category: "", duration_label: "" });
   const [saving, setSaving] = useState(false);
+  // Floor breach warning dialog
+  const [breachItem, setBreachItem] = useState<Indulgence | null>(null);
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    setUserId(user.id);
 
     const { data } = await supabase
       .from("indulgences")
@@ -54,7 +65,7 @@ export function IndulgenceShop() {
       .eq("user_id", user.id)
       .order("xp_cost", { ascending: true });
 
-    if (data) setIndulgences(data);
+    if (data) setIndulgences(data as Indulgence[]);
     setLoading(false);
   }, []);
 
@@ -64,47 +75,55 @@ export function IndulgenceShop() {
     return () => window.removeEventListener("xp_updated", fetchData);
   }, [fetchData]);
 
-  const handleBuy = async (item: Indulgence) => {
-    if (!userId) return;
-    if (totalXp < item.xp_cost) {
-      toast.error(`Not enough XP. You need ${item.xp_cost - totalXp} more XP.`);
-      return;
-    }
+  const executeBuy = async (item: Indulgence) => {
     setBuying(item.id);
     try {
-      const result = await spendXP(userId, item.xp_cost, item.name);
+      const result = await spendXPFromPool(item.xp_cost, `Indulgence: ${item.name}`, item.id, item.name);
       if (result.success) {
-        toast.success(`Redeemed: ${item.name}! (−${item.xp_cost} XP)`);
+        toast.success(`Redeemed: ${item.name}! (−${item.xp_cost} XP from pool)`);
         window.dispatchEvent(new CustomEvent("xp_updated"));
       } else {
-        toast.error(result.error ?? "Purchase failed.");
+        toast.error("Not enough XP in spending pool.");
       }
     } catch {
       toast.error("Something went wrong.");
     } finally {
       setBuying(null);
+      setBreachItem(null);
     }
   };
 
-  const handleAddItem = async () => {
-    if (!userId || !newItem.name.trim() || !newItem.xp_cost) return;
-    const cost = parseInt(newItem.xp_cost);
-    if (isNaN(cost) || cost <= 0) {
-      toast.error("XP cost must be a positive number.");
+  const handleBuy = (item: Indulgence) => {
+    if (spendingPool < item.xp_cost) {
+      // Check if they have total XP but not pool XP — means they'd breach the floor
+      if (totalXp >= item.xp_cost && spendingPool < item.xp_cost) {
+        setBreachItem(item);
+      } else {
+        toast.error(`Not enough XP in spending pool. Pool: ${spendingPool} XP, Cost: ${item.xp_cost} XP.`);
+      }
       return;
     }
+    executeBuy(item);
+  };
+
+  const handleAddItem = async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !newItem.name.trim() || !newItem.xp_cost) return;
+    const cost = parseInt(newItem.xp_cost);
+    if (isNaN(cost) || cost <= 0) { toast.error("XP cost must be a positive number."); return; }
     setSaving(true);
     try {
-      const supabase = createClient();
       const { error } = await supabase.from("indulgences").insert({
-        user_id: userId,
+        user_id: user.id,
         name: newItem.name.trim(),
         xp_cost: cost,
         category: newItem.category.trim() || null,
+        duration_label: newItem.duration_label.trim() || null,
       });
       if (error) throw error;
       toast.success(`"${newItem.name}" added to shop!`);
-      setNewItem({ name: "", xp_cost: "", category: "" });
+      setNewItem({ name: "", xp_cost: "", category: "", duration_label: "" });
       setShowAddForm(false);
       await fetchData();
     } catch {
@@ -127,6 +146,8 @@ export function IndulgenceShop() {
     );
   }
 
+  const poolLow = spendingPool < XP_PER_LEVEL * 0.2;
+
   return (
     <div className="space-y-5 mt-8">
       {/* Header */}
@@ -136,31 +157,39 @@ export function IndulgenceShop() {
           <h2 className="text-xl font-bold">Indulgence Shop</h2>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/30">
-            <Coins className="h-4 w-4 text-yellow-500" />
-            <span className="text-sm font-bold text-yellow-500">{totalXp} XP</span>
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${
+            poolLow
+              ? "bg-red-500/10 border-red-500/30"
+              : "bg-yellow-500/10 border-yellow-500/30"
+          }`}>
+            <Coins className={`h-4 w-4 ${poolLow ? "text-red-500" : "text-yellow-500"}`} />
+            <span className={`text-sm font-bold ${poolLow ? "text-red-500" : "text-yellow-500"}`}>
+              {spendingPool} pool XP
+            </span>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setShowAddForm((v) => !v)}
-          >
+          <Button size="sm" variant="outline" onClick={() => setShowAddForm((v) => !v)}>
             <Plus className="h-4 w-4 mr-1" />
             Add Item
           </Button>
         </div>
       </div>
 
+      {poolLow && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 text-sm">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <span>Spending pool is low. Complete tasks or habits to earn more XP before spending.</span>
+        </div>
+      )}
+
       {/* Add item form */}
       {showAddForm && (
         <div className="p-4 rounded-xl border border-primary/30 bg-primary/5 space-y-3">
           <p className="text-sm font-semibold">New Indulgence</p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <Input
               placeholder="Item name"
               value={newItem.name}
               onChange={(e) => setNewItem((v) => ({ ...v, name: e.target.value }))}
-              className="col-span-1"
             />
             <Input
               type="number"
@@ -169,18 +198,21 @@ export function IndulgenceShop() {
               onChange={(e) => setNewItem((v) => ({ ...v, xp_cost: e.target.value }))}
             />
             <Input
-              placeholder="Category (optional)"
+              placeholder="Category (e.g. food, leisure)"
               value={newItem.category}
               onChange={(e) => setNewItem((v) => ({ ...v, category: e.target.value }))}
+            />
+            <Input
+              placeholder="Duration label (e.g. 1 hour)"
+              value={newItem.duration_label}
+              onChange={(e) => setNewItem((v) => ({ ...v, duration_label: e.target.value }))}
             />
           </div>
           <div className="flex gap-2">
             <Button size="sm" onClick={handleAddItem} disabled={saving || !newItem.name.trim() || !newItem.xp_cost}>
               {saving ? "Saving..." : "Save"}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setShowAddForm(false)}>
-              Cancel
-            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowAddForm(false)}>Cancel</Button>
           </div>
         </div>
       )}
@@ -188,13 +220,13 @@ export function IndulgenceShop() {
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {indulgences.map((item) => {
-          const canAfford = totalXp >= item.xp_cost;
+          const canAffordPool = spendingPool >= item.xp_cost;
           const isBuying = buying === item.id;
           return (
             <div
               key={item.id}
               className={`p-4 rounded-xl border flex items-center justify-between gap-4 transition-all ${
-                canAfford
+                canAffordPool
                   ? "border-border/40 bg-muted/40"
                   : "border-border/20 bg-muted/20 opacity-60"
               }`}
@@ -202,21 +234,25 @@ export function IndulgenceShop() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="font-semibold text-sm truncate">{item.name}</h3>
-                  {!canAfford && <Lock className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+                  {!canAffordPool && <Lock className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
                 </div>
-                {item.category && (
-                  <Badge
-                    variant="outline"
-                    className={`text-xs ${categoryColor(item.category)}`}
-                  >
-                    {item.category}
-                  </Badge>
-                )}
+                <div className="flex flex-wrap gap-1">
+                  {item.category && (
+                    <Badge variant="outline" className={`text-xs ${categoryColor(item.category)}`}>
+                      {item.category}
+                    </Badge>
+                  )}
+                  {item.duration_label && (
+                    <Badge variant="outline" className="text-xs text-muted-foreground">
+                      {item.duration_label}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <Button
                 size="sm"
-                disabled={!canAfford || isBuying}
-                variant={canAfford ? "default" : "secondary"}
+                disabled={isBuying}
+                variant={canAffordPool ? "default" : "secondary"}
                 onClick={() => handleBuy(item)}
                 className="flex-shrink-0"
               >
@@ -237,6 +273,28 @@ export function IndulgenceShop() {
           </div>
         )}
       </div>
+
+      {/* Floor breach warning dialog */}
+      <Dialog open={!!breachItem} onOpenChange={(v) => { if (!v) setBreachItem(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-500">
+              <AlertTriangle className="h-5 w-5" />
+              Spending Pool Too Low
+            </DialogTitle>
+            <DialogDescription>
+              <strong>{breachItem?.name}</strong> costs <strong>{breachItem?.xp_cost} XP</strong> but your
+              spending pool only has <strong>{spendingPool} XP</strong>. Indulgences can only be purchased
+              from your pool — XP below your level floor is protected.
+              <br /><br />
+              Earn more XP by completing tasks, habits, or exercise before spending here.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBreachItem(null)}>Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

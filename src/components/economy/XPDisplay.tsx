@@ -1,58 +1,108 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect } from "react";
-import { Progress } from "@/components/ui/progress";
 import { useRealtimeXP } from "@/hooks/useRealtimeXP";
-import { motion } from "framer-motion";
+import { XP_PER_LEVEL } from "@/lib/xp";
 import confetti from "canvas-confetti";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+
+function XPBar({
+  value,
+  max,
+  color,
+  label,
+  className,
+}: {
+  value: number;
+  max: number;
+  color: string;
+  label: string;
+  className?: string;
+}) {
+  const pct = Math.min(100, max > 0 ? (value / max) * 100 : 0);
+  return (
+    <div className={cn("space-y-1", className)}>
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>{label}</span>
+        <span>{value} / {max}</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+        <div
+          className={cn("h-full rounded-full transition-all duration-700", color)}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
 
 export function XPDisplay() {
-  const { totalXp, level } = useRealtimeXP();
-  const [isLevelUp, setIsLevelUp] = useState(false);
+  const { totalXp, level, levelFloor, spendingPool, xpToNext } = useRealtimeXP();
+  const prevLevelRef = useRef(level);
 
   useEffect(() => {
-    if (level > 1) {
-      setIsLevelUp(true);
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-      });
+    if (level > prevLevelRef.current) {
+      confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
     }
+    prevLevelRef.current = level;
   }, [level]);
 
-  const xpForCurrentLevel = 100 * Math.pow(level - 1, 2);
-  const xpForNextLevel = 100 * Math.pow(level, 2);
-  const progress = ((totalXp - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) * 100;
+  // Bar 1: Spending pool — how much XP above the floor (spendable)
+  // Color: green when plenty, amber when low, red when nearly empty
+  const poolPct = (spendingPool / XP_PER_LEVEL) * 100;
+  const poolColor =
+    poolPct > 50 ? "bg-emerald-500" : poolPct > 20 ? "bg-amber-500" : "bg-red-500";
+
+  // Bar 2: Floor protection — always shown in slate to indicate "locked" XP
+  // This visually represents that the floor XP cannot be spent via indulgences
+  const floorPct = levelFloor > 0 ? Math.min(100, (levelFloor / totalXp) * 100) : 0;
 
   return (
-    <>
-      <div className="p-4 rounded-lg border border-border/40 bg-muted/40">
-        <div className="flex items-center justify-between mb-2">
-          <motion.div
-            animate={{ scale: isLevelUp ? [1, 1.2, 1] : 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <Badge>Level {level}</Badge>
-          </motion.div>
-          <p className="text-sm text-muted-foreground">{totalXp} XP</p>
-        </div>
-        <Progress value={progress} className="transition-all duration-500" />
+    <div className="p-4 rounded-lg border border-border/40 bg-muted/40 space-y-3">
+      <div className="flex items-center justify-between">
+        <Badge variant="secondary" className="font-bold text-sm">
+          Level {level}
+        </Badge>
+        <span className="text-xs text-muted-foreground">{totalXp.toLocaleString()} XP total</span>
       </div>
-      <Dialog open={isLevelUp} onOpenChange={setIsLevelUp}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>LEVEL UP: SYSTEM EVOLVED</DialogTitle>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
-    </>
+
+      {/* Bar 1: Spending Pool */}
+      <XPBar
+        value={spendingPool}
+        max={XP_PER_LEVEL}
+        color={poolColor}
+        label="Spending Pool"
+      />
+
+      {/* Bar 2: Floor Protection */}
+      <XPBar
+        value={levelFloor}
+        max={Math.max(levelFloor, totalXp)}
+        color="bg-slate-500/60"
+        label="Level Floor (protected)"
+      />
+
+      <p className="text-xs text-muted-foreground text-right">
+        {xpToNext} XP to Level {level + 1}
+      </p>
+    </div>
+  );
+}
+
+/** Compact inline version — for sidebar / header use */
+export function XPBadge() {
+  const { totalXp, level, progressPct } = useRealtimeXP();
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <Badge variant="outline" className="text-xs font-bold">Lv {level}</Badge>
+      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden min-w-[60px]">
+        <div
+          className="h-full bg-primary rounded-full transition-all duration-500"
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
+      <span className="text-muted-foreground">{totalXp.toLocaleString()} XP</span>
+    </div>
   );
 }
