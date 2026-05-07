@@ -8,7 +8,10 @@
       "Bash(node -e ' *)",
       "Bash(node -e \"const fs = require\\('fs'\\); const raw = fs.readFileSync\\('src/types/database.types.ts', 'utf16le'\\); console.log\\(raw.slice\\(-3000\\)\\)\")",
       "Bash(node -e \"const fs = require\\('fs'\\); const raw = fs.readFileSync\\('src/types/database.types.ts', 'utf16le'\\); const idx = raw.indexOf\\('Views:'\\); console.log\\(raw.slice\\(idx - 200, idx + 100\\)\\)\")",
-      "Bash(node -e \"const fs = require\\('fs'\\); const raw = fs.readFileSync\\('src/types/database.types.ts', 'utf16le'\\); const lines = raw.split\\('\\\\n'\\); lines.slice\\(438, 455\\).forEach\\(\\(l, i\\) => console.log\\(438+i, JSON.stringify\\(l\\)\\)\\)\")"
+      "Bash(node -e \"const fs = require\\('fs'\\); const raw = fs.readFileSync\\('src/types/database.types.ts', 'utf16le'\\); const lines = raw.split\\('\\\\n'\\); lines.slice\\(438, 455\\).forEach\\(\\(l, i\\) => console.log\\(438+i, JSON.stringify\\(l\\)\\)\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }

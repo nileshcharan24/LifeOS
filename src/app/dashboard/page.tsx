@@ -50,6 +50,7 @@ export default function DashboardPage() {
           <button onClick={() => setActiveTab("dashboard")} className={`w-full text-left rounded-lg px-3 py-2 text-sm ${activeTab === 'dashboard' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}>Dashboard</button>
           <button onClick={() => setActiveTab("habits")} className={`w-full text-left rounded-lg px-3 py-2 text-sm ${activeTab === 'habits' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}>Habit Grid</button>
           <button onClick={() => setActiveTab("planner")} className={`w-full text-left rounded-lg px-3 py-2 text-sm ${activeTab === 'planner' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}>Planner</button>
+          <button onClick={() => setActiveTab("academic")} className={`w-full text-left rounded-lg px-3 py-2 text-sm ${activeTab === 'academic' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}>Academic</button>
           <button onClick={() => setActiveTab("history")} className={`w-full text-left rounded-lg px-3 py-2 text-sm ${activeTab === 'history' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}>History & Journal</button>
           <button onClick={() => setActiveTab("journal")} className={`w-full text-left rounded-lg px-3 py-2 text-sm ${activeTab === 'journal' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}>Journal & Oracle</button>
           <button onClick={() => setActiveTab("settings")} className={`w-full text-left rounded-lg px-3 py-2 text-sm ${activeTab === 'settings' ? 'bg-muted/80 text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}>Settings</button>
@@ -104,13 +105,22 @@ export default function DashboardPage() {
         {activeTab === "planner" && (
           <div className="space-y-10">
             <div>
-              <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Planning & Academia</p>
+              <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Planning & Tasks</p>
               <h1 className="text-3xl font-semibold mb-6">Planner</h1>
               <PersonalPlanner />
             </div>
             <div>
               <h2 className="text-xl font-bold mb-4">All Tasks — Sort by Urgency</h2>
               <TaskTable />
+            </div>
+          </div>
+        )}
+
+        {activeTab === "academic" && (
+          <div>
+            <div className="mb-6">
+              <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Courses & Attendance</p>
+              <h1 className="text-3xl font-semibold">Academic Tracker</h1>
             </div>
             <AcademicTracker />
           </div>
