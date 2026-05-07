@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Pin, PinOff, Trash2, Pencil } from "lucide-react";
 import { NOTE_COLORS, NoteEditor } from "@/components/notes/NoteEditor";
-import type { Note, NoteContent } from "@/services/notes/notesService";
+import type { Note, NoteContent, ChecklistItem } from "@/services/notes/notesService";
 
 type Props = {
   note: Note;
@@ -23,7 +23,11 @@ export function NoteCard({ note, onPin, onDelete, onUpdate }: Props) {
   const [hovered, setHovered] = useState(false);
 
   const colorHex = NOTE_COLORS.find((c) => c.key === note.color)?.hex ?? "";
-  const content = note.content as Record<string, unknown>;
+
+  // Narrow content to concrete types based on the discriminant field
+  const textContent  = note.type === "text"      ? (note.content as { text: string })           : null;
+  const listContent  = note.type === "checklist"  ? (note.content as { items: ChecklistItem[] }) : null;
+  const listItems    = listContent?.items ?? [];
 
   if (editing) {
     return (
@@ -49,7 +53,7 @@ export function NoteCard({ note, onPin, onDelete, onUpdate }: Props) {
       onClick={() => setEditing(true)}
     >
       <div className="p-4">
-        {/* Pin button */}
+        {/* Title row + pin button */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex-1 min-w-0">
             {note.title && (
@@ -69,30 +73,29 @@ export function NoteCard({ note, onPin, onDelete, onUpdate }: Props) {
           </button>
         </div>
 
-        {/* Content preview */}
-        {note.type === "text" && content.text && (
+        {/* Text content preview */}
+        {textContent?.text && (
           <p className="text-xs leading-relaxed text-foreground/80 line-clamp-6 whitespace-pre-wrap">
-            {content.text as string}
+            {textContent.text}
           </p>
         )}
 
-        {note.type === "checklist" && Array.isArray(content.items) && (
+        {/* Checklist preview */}
+        {listContent && listItems.length > 0 && (
           <div className="space-y-1">
-            {(content.items as { id: string; text: string; checked: boolean }[])
-              .slice(0, 8)
-              .map((item) => (
-                <div key={item.id} className="flex items-center gap-2">
-                  <div className={`h-3.5 w-3.5 rounded-sm border flex-shrink-0 flex items-center justify-center ${item.checked ? "border-foreground/40 bg-foreground/20" : "border-foreground/30"}`}>
-                    {item.checked && <span className="text-[8px] text-foreground">✓</span>}
-                  </div>
-                  <span className={`text-xs leading-tight ${item.checked ? "line-through text-muted-foreground" : "text-foreground/80"}`}>
-                    {item.text}
-                  </span>
+            {listItems.slice(0, 8).map((item) => (
+              <div key={item.id} className="flex items-center gap-2">
+                <div className={`h-3.5 w-3.5 rounded-sm border flex-shrink-0 flex items-center justify-center ${item.checked ? "border-foreground/40 bg-foreground/20" : "border-foreground/30"}`}>
+                  {item.checked && <span className="text-[8px] text-foreground">✓</span>}
                 </div>
-              ))}
-            {(content.items as unknown[]).length > 8 && (
+                <span className={`text-xs leading-tight ${item.checked ? "line-through text-muted-foreground" : "text-foreground/80"}`}>
+                  {item.text}
+                </span>
+              </div>
+            ))}
+            {listItems.length > 8 && (
               <p className="text-[10px] text-muted-foreground pl-5 mt-1">
-                +{(content.items as unknown[]).length - 8} more
+                +{listItems.length - 8} more
               </p>
             )}
           </div>
@@ -110,7 +113,7 @@ export function NoteCard({ note, onPin, onDelete, onUpdate }: Props) {
         )}
       </div>
 
-      {/* Bottom actions */}
+      {/* Bottom actions — visible on hover */}
       <div
         className={`flex items-center justify-end px-3 py-1.5 border-t border-black/5 gap-1 transition-opacity ${
           hovered ? "opacity-100" : "opacity-0"
