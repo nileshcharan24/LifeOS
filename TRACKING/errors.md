@@ -4,3 +4,4 @@
 - [Pending] Landing redirect loop: localhost / -> /dashboard -> /login when session check fails; mitigated by fail-open session check in landing and proxy guard only when no session and no error; verify locally.
 - [Pending] Middleware rename: migrated to proxy (`src/proxy.ts`), removing old middleware entry.
 
+---
