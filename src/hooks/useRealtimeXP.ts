@@ -58,15 +58,20 @@ export function useRealtimeXP() {
     };
     window.addEventListener("xp_updated", handleXpUpdated);
 
-    // Setup Realtime Channel
-    if (channelRef.current) {
-      // If channel already exists, remove it before creating a new one
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
+    // Setup Realtime Channel — remove any pre-existing channel with this
+    // name from the Supabase client's internal registry first, otherwise
+    // `.channel()` returns the cached already-subscribed instance and `.on()`
+    // throws (notably under React Strict Mode's double-invoke in dev).
+    const channelName = `profile_xp_${user.id}`;
+    for (const existing of supabase.getChannels()) {
+      if (existing.topic === `realtime:${channelName}`) {
+        supabase.removeChannel(existing);
+      }
     }
+    channelRef.current = null;
 
     channelRef.current = supabase
-      .channel(`profile_xp_${user.id}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${user.id}` },
