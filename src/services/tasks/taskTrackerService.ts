@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { archiveItem } from "@/services/archiveService";
 import { revalidatePath } from "next/cache";
 import { addDays, addWeeks, format, parseISO } from "date-fns";
 import { randomUUID } from "crypto";
@@ -402,13 +403,17 @@ export async function deleteDailyTask(id: string, deleteSeries: boolean) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  if (deleteSeries) {
-    const { data: task } = await supabase
-      .from("daily_tasks")
-      .select("series_id, task_date")
-      .eq("id", id)
-      .single();
+  const { data: task } = await supabase
+    .from("daily_tasks")
+    .select("*")
+    .eq("id", id)
+    .single();
 
+  if (!task) throw new Error("Task not found");
+
+  await archiveItem("daily_task", task);
+
+  if (deleteSeries) {
     if ((task as any)?.series_id) {
       await supabase
         .from("daily_tasks")
@@ -424,6 +429,50 @@ export async function deleteDailyTask(id: string, deleteSeries: boolean) {
   revalidatePath("/dashboard");
 }
 
+export async function toggleDailyTask(id: string, isCompleted: boolean) {
+ const supabase = await createClient();
+ const { data: { user } } = await supabase.auth.getUser();
+ if (!user) throw new Error("Not authenticated");
+
+ const { data: task } = await supabase
+   .from("daily_tasks")
+   .select("xp_earned, name, urgency, task_date")
+   .eq("id", id)
+   .single();
+
+ if (!task) throw new Error("Task not found");
+
+  if (isCompleted) {
+    if (!task.task_date) throw new Error("Task date not found");
+    const result = await completeDailyTask(id, task.urgency as any, task.name || "Untitled Task", task.task_date);
+    
+    // Find and complete the corresponding planner task
+    const { data: plannerTask } = await supabase
+      .from("tasks")
+      .select("id, is_completed")
+      .eq("title", task.name)
+      .single();
+
+    if (plannerTask && !plannerTask.is_completed) {
+      await togglePlannerTask(plannerTask.id, false);
+    }
+    return result;
+  } else {
+    const result = await uncompleteDailyTask(id);
+
+    // Find and un-complete the corresponding planner task
+    const { data: plannerTask } = await supabase
+      .from("tasks")
+      .select("id, is_completed")
+      .eq("title", task.name)
+      .single();
+      
+    if (plannerTask && plannerTask.is_completed) {
+      await togglePlannerTask(plannerTask.id, true);
+    }
+    return result;
+  }
+}
 // ─── Planner task bridge ──────────────────────────────────────────────────────
 // Tasks from the `tasks` table (Planner) whose deadline falls within the
 // provided UTC window (computed from the user's local midnight on the client).
@@ -481,6 +530,29 @@ export async function togglePlannerTask(id: string, currentlyCompleted: boolean)
   revalidatePath("/dashboard");
 }
 
+export async function addPlannerTaskToDailyTasks(task: PlannerTask) {
+ const supabase = await createClient();
+ const { data: { user } } = await supabase.auth.getUser();
+ if (!user) throw new Error("Not authenticated");
+
+ const today = format(new Date(), "yyyy-MM-dd");
+
+ const { error } = await supabase.from("daily_tasks").insert([
+   {
+     user_id: user.id,
+     name: task.title,
+     urgency: task.priority === "urgent" ? "high" : task.priority,
+     deadline: task.deadline,
+     notes: task.description || "",
+     recurring: "none",
+     is_completed: false,
+     task_date: today,
+   },
+ ]);
+
+ if (error) throw error;
+ revalidatePath("/dashboard");
+}
 // ─── Academic Integration ─────────────────────────────────────────────────────
 
 export async function getAssessmentsForTracker(

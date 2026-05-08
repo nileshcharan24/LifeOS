@@ -6,6 +6,7 @@ import {
   BarChart2, User, FileText, Trophy, Settings, LogOut,
   Sparkles, Briefcase, UserCircle, ChevronLeft, ChevronRight,
   Shield,
+  Archive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,7 @@ import { useRealtimeXP } from "@/hooks/useRealtimeXP";
 export type Tab =
   | "dashboard" | "daily" | "habits" | "planner" | "academic"
   | "history" | "journal" | "oracle" | "health" | "career"
-  | "settings" | "about" | "growth" | "notes" | "profile";
+  | "settings" | "about" | "growth" | "notes" | "profile" | "archived";
 
 interface NavItem {
   id: Tab;
@@ -26,7 +27,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard",         icon: Home },
   { id: "daily",     label: "Daily Tracker",      icon: CheckSquare },
-  { id: "habits",    label: "Habit Grid",         icon: Trophy },
+  { id: "habits",    label: "Daily Habits",       icon: Trophy },
   { id: "planner",   label: "Planner",            icon: Calendar },
   { id: "academic",  label: "Academic",           icon: BookOpen },
   { id: "health",    label: "Health",             icon: Heart },
@@ -39,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "oracle",    label: "Oracle",             icon: Sparkles },
   { id: "about",     label: "About Me",           icon: UserCircle, deepOnly: true },
   { id: "settings",  label: "Settings",           icon: Settings },
+  { id: "archived",  label: "Archived",           icon: Archive },
 ];
 
 function LevelBadge() {

@@ -10,7 +10,7 @@ import { JournalEditor } from "@/features/journal/JournalEditor";
 import { OracleChat } from "@/features/ai/OracleChat";
 import { IndulgenceShop } from "@/components/dashboard/IndulgenceShop";
 import { HistoryCalendar } from "@/components/dashboard/HistoryCalendar";
-import { HabitGrid } from "@/components/dashboard/HabitGrid";
+import { ManageHabits } from "@/components/tasks/ManageHabits";
 import { PersonalPlanner } from "@/components/planner/PersonalPlanner";
 import { TaskTable } from "@/components/planner/TaskTable";
 import { AcademicTracker } from "@/components/academic/AcademicTracker";
@@ -24,6 +24,7 @@ import { DangerZone } from "@/components/settings/DangerZone";
 import { AboutMe } from "@/components/settings/AboutMe";
 import { GrowthVault } from "@/components/growth/GrowthVault";
 import { NotesPage } from "@/components/notes/NotesPage";
+import { ArchivedItems } from "@/components/settings/ArchivedItems";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -77,10 +78,10 @@ export default function DashboardPage() {
             <div className="space-y-10">
               <div>
                 <div className="mb-6">
-                  <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Recurring Habits</p>
-                  <h1 className="text-3xl font-semibold">Habit Grid</h1>
+                  <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Daily Habits</p>
+                  <h1 className="text-3xl font-semibold">Manage Habits</h1>
                 </div>
-                <HabitGrid />
+                <ManageHabits />
               </div>
               {isDeepMode ? (
                 <div className="pt-2 border-t border-border/40">
@@ -271,6 +272,17 @@ export default function DashboardPage() {
               <DangerZone />
             </div>
           </div>
+        )}
+
+        {/* Archived Items */}
+        {has("archived") && (
+           <div className={show("archived")}>
+               <div className="mb-6">
+                   <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Archive</p>
+                   <h1 className="text-3xl font-semibold">Archived Items</h1>
+               </div>
+               <ArchivedItems />
+           </div>
         )}
       </main>
     </div>

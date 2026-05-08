@@ -20,7 +20,7 @@ import { useMode } from "@/context/ModeContext";
 import {
   CheckCircle2, Circle, Calendar, BookMarked, Heart,
   Zap, ShoppingBag, Pencil, ArrowRight, Clock, TrendingUp,
-  AlertCircle, Flame, Sparkles, Lock, MessageSquare, BookOpen, Briefcase,
+  AlertCircle, Flame, Sparkles, Lock, MessageSquare, BookOpen, Briefcase, PlusCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -122,7 +122,29 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
   const completedHabits = instances.filter(i => i.completed).length;
   const completedTasks  = tasks.filter(t => t.is_completed).length;
 
+  const handleToggleTask = async (taskId: string) => {
+    setToggling(taskId);
+    try {
+      const { toggleDailyTask } = await import("@/services/tasks/taskTrackerService");
+      const task = tasks.find(t => t.id === taskId);
+      if (task) {
+        await toggleDailyTask(taskId, !task.is_completed);
+        const newTasks = await getDailyTasksForDate(today);
+        setTasks(newTasks);
+        window.dispatchEvent(new CustomEvent("daily_data_updated"));
+      }
+    } catch (error) {
+      console.error("Failed to toggle task:", error);
+      toast.error("Failed to update task.");
+    } finally {
+      setToggling(null);
+    }
+  };
+
   const sortedTasks = [...tasks].sort((a, b) => {
+    if (a.is_completed !== b.is_completed) {
+      return a.is_completed ? 1 : -1;
+    }
     const order = { high: 0, medium: 1, low: 2 };
     const aD = a.deadline ? new Date(a.deadline).getTime() : Infinity;
     const bD = b.deadline ? new Date(b.deadline).getTime() : Infinity;
@@ -194,20 +216,33 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
         {/* Tasks mini list */}
         <div>
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Tasks</p>
-          <div className="space-y-1.5">
-            {sortedTasks.slice(0, 5).map(task => (
-              <div key={task.id} className="flex items-center gap-2 text-sm">
-                {task.is_completed
-                  ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
-                  : <Circle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
-                <span className={cn("truncate", task.is_completed && "line-through text-muted-foreground")}>
-                  {task.name}
-                </span>
-                <Badge variant="outline" className={cn("text-[10px] px-1 py-0 ml-auto flex-shrink-0", urgencyColor(task.urgency))}>
-                  {task.urgency}
-                </Badge>
-              </div>
-            ))}
+          <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-2">
+            {sortedTasks.map(task => {
+              const done = task.is_completed;
+              const isTogglingThis = toggling === task.id;
+              return (
+                <button
+                  key={task.id}
+                  onClick={() => handleToggleTask(task.id)}
+                  disabled={isTogglingThis}
+                  className="flex items-center gap-2 text-sm w-full hover:bg-muted/50 p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                >
+                  {isTogglingThis ? (
+                    <div className="h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin flex-shrink-0" />
+                  ) : done ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                  ) : (
+                    <Circle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                  )}
+                  <span className={cn("truncate", done && "line-through text-muted-foreground")}>
+                    {task.name}
+                  </span>
+                  <Badge variant="outline" className={cn("text-[10px] px-1 py-0 ml-auto flex-shrink-0", urgencyColor(task.urgency))}>
+                    {task.urgency}
+                  </Badge>
+                </button>
+              );
+            })}
             {tasks.length === 0 && (
               <p className="text-xs text-muted-foreground">No tasks today</p>
             )}
@@ -284,7 +319,7 @@ function NegativeHabitsSection({ onNav }: { onNav: (tab: string) => void }) {
 
 // ─── Section 3: Upcoming Deadlines ────────────────────────────────────────────
 
-function UpcomingDeadlinesSection({ onNav }: { onNav: (tab: string) => void }) {
+function UpcomingDeadlinesSection({ onNav, handleMoveTask, moving }: { onNav: (tab: string) => void; handleMoveTask: (task: any) => Promise<void>; moving: string | null; }) {
   const [tasks, setTasks]   = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -353,7 +388,13 @@ function UpcomingDeadlinesSection({ onNav }: { onNav: (tab: string) => void }) {
               <div className="space-y-1">
                 {byDay[day].slice(0, 3).map(task => (
                   <div key={task.id} className="flex items-center gap-2 text-sm">
-                    <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    <button onClick={() => handleMoveTask(task)} disabled={moving === task.id} className="text-muted-foreground hover:text-primary disabled:opacity-50">
+                      {moving === task.id ? (
+                        <div className="h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                      ) : (
+                        <PlusCircle className="h-3.5 w-3.5" />
+                      )}
+                    </button>
                     <span className="truncate flex-1">{task.title}</span>
                     <Badge variant="outline" className={cn("text-[10px] px-1 py-0 ml-auto flex-shrink-0", urgencyColor(task.priority ?? "medium"))}>
                       {task.priority ?? "medium"}
@@ -379,7 +420,7 @@ function UpcomingDeadlinesSection({ onNav }: { onNav: (tab: string) => void }) {
 
 // ─── Section 3.5: Unscheduled Tasks ───────────────────────────────────────────
 
-function UnscheduledTasksSection({ onNav }: { onNav: (tab: string) => void }) {
+function UnscheduledTasksSection({ onNav, handleMoveTask, moving }: { onNav: (tab: string) => void; handleMoveTask: (task: any) => Promise<void>; moving: string | null; }) {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -417,7 +458,13 @@ function UnscheduledTasksSection({ onNav }: { onNav: (tab: string) => void }) {
         <div className="space-y-2">
           {tasks.slice(0, 5).map(task => (
             <div key={task.id} className="flex items-center gap-2 text-sm">
-              <Circle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+               <button onClick={() => handleMoveTask(task)} disabled={moving === task.id} className="text-muted-foreground hover:text-primary disabled:opacity-50">
+                   {moving === task.id ? (
+                       <div className="h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                   ) : (
+                       <PlusCircle className="h-3.5 w-3.5" />
+                   )}
+               </button>
               <span className="truncate flex-1">{task.title}</span>
               <Badge variant="outline" className={cn("text-[10px] px-1 py-0 flex-shrink-0", urgencyColor(task.priority ?? "medium"))}>
                 {task.priority ?? "medium"}
@@ -991,6 +1038,23 @@ interface DashboardHubProps {
 
 export function DashboardHub({ onNav }: DashboardHubProps) {
   const { isDeepMode } = useMode();
+  const [moving, setMoving] = useState<string | null>(null);
+
+  const handleMoveTask = async (task: any) => {
+    setMoving(task.id);
+    try {
+      const { addPlannerTaskToDailyTasks } = await import("@/services/tasks/taskTrackerService");
+      await addPlannerTaskToDailyTasks(task);
+      toast.success(`Moved "${task.title}" to today's tasks.`);
+      window.dispatchEvent(new CustomEvent("daily_data_updated"));
+      window.dispatchEvent(new CustomEvent("planner_tasks_updated"));
+    } catch (error) {
+      console.error("Failed to move task:", error);
+      toast.error("Failed to move task.");
+    } finally {
+      setMoving(null);
+    }
+  };
 
   return (
     <div className="space-y-5 max-w-5xl">
@@ -1002,8 +1066,8 @@ export function DashboardHub({ onNav }: DashboardHubProps) {
       <DailyHabitsTasksSection onNav={onNav} />
       {isDeepMode && <NegativeHabitsSection onNav={onNav} />}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <UpcomingDeadlinesSection onNav={onNav} />
-        <UnscheduledTasksSection onNav={onNav} />
+        <UpcomingDeadlinesSection onNav={onNav} handleMoveTask={handleMoveTask} moving={moving} />
+        <UnscheduledTasksSection onNav={onNav} handleMoveTask={handleMoveTask} moving={moving} />
       </div>
       <JournalTodaySection onNav={onNav} />
       <HealthSnapshotSection onNav={onNav} />

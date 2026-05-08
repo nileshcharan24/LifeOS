@@ -83,7 +83,12 @@ export function TaskTable() {
 
   useEffect(() => {
     fetchTasks();
+    const handleUpdate = () => fetchTasks();
+    window.addEventListener("planner_tasks_updated", handleUpdate);
+    return () => window.removeEventListener("planner_tasks_updated", handleUpdate);
   }, [fetchTasks]);
+
+  const broadcastTasksUpdate = () => window.dispatchEvent(new CustomEvent("planner_tasks_updated"));
 
   const sorted = [...tasks]
     .filter((t) => showCompleted || !t.is_completed)
@@ -104,6 +109,7 @@ export function TaskTable() {
     try {
       await toggleTask(task.id, !!task.is_completed);
       await fetchTasks();
+      broadcastTasksUpdate();
     } finally {
       setToggling(null);
     }
@@ -113,6 +119,7 @@ export function TaskTable() {
     await deleteTask(taskId);
     toast.success("Task deleted.");
     await fetchTasks();
+    broadcastTasksUpdate();
   };
 
   const SortButton = ({ label, value }: { label: string; value: SortKey }) => (

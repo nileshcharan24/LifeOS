@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { format, parseISO, addDays, isToday, isTomorrow } from "date-fns";
+import { format, parseISO, addDays, isToday, isTomorrow, isSameDay } from "date-fns";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,10 +109,21 @@ export function DailyTracker() {
     setLoading(false);
   }, [today, tomorrow]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    fetchAll();
+    const handleUpdate = () => fetchAll();
+    window.addEventListener("planner_tasks_updated", handleUpdate);
+    window.addEventListener("xp_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("planner_tasks_updated", handleUpdate);
+      window.removeEventListener("xp_updated", handleUpdate);
+    };
+  }, [fetchAll]);
 
   // XP update broadcast so XPDisplay refreshes
   const broadcastXP = () => window.dispatchEvent(new CustomEvent("xp_updated"));
+  const broadcastPlannerTasksUpdate = () => window.dispatchEvent(new CustomEvent("planner_tasks_updated"));
+  const broadcastDailyData = () => window.dispatchEvent(new CustomEvent("daily_data_updated"));
 
   // ── derived ────────────────────────────────────────────────────────────────
   const instanceMap = useMemo(
@@ -140,6 +151,7 @@ export function DailyTracker() {
         if (isPerfectDay) toast.success(`🏆 Perfect Day! +${PERFECT_DAY_BONUS} XP bonus!`);
       }
       await fetchAll();
+      broadcastDailyData();
     } catch {
       toast.error("Failed to update habit.");
     } finally {
@@ -161,6 +173,7 @@ export function DailyTracker() {
       setTaskForm({ name: "", urgency: "medium", deadline: "", notes: "", recurring: "none" });
       setShowAddTask(false);
       await fetchAll();
+      broadcastDailyData();
     } catch {
       toast.error("Failed to add task.");
     } finally {
@@ -176,6 +189,7 @@ export function DailyTracker() {
       toast.success("Task updated!");
       setEditingTask(null);
       await fetchAll();
+      broadcastDailyData();
     } catch {
       toast.error("Failed to update task.");
     } finally {
@@ -191,6 +205,7 @@ export function DailyTracker() {
       toast.success(`+${xpGranted} XP — "${task.name}" done!`);
       if (isProductiveDay) toast.success(`🎯 Productive Day! +${PRODUCTIVE_DAY_BONUS} XP bonus!`);
       await fetchAll();
+      broadcastDailyData();
     } catch {
       toast.error("Failed to complete task.");
     } finally {
@@ -205,6 +220,7 @@ export function DailyTracker() {
       broadcastXP();
       toast.info(`Task unmarked. -${xpReversed} XP reversed.`);
       await fetchAll();
+      broadcastDailyData();
     } catch {
       toast.error("Failed to undo.");
     } finally {
@@ -219,6 +235,7 @@ export function DailyTracker() {
       toast.success(deleteSeries ? "Recurring series deleted." : "Task deleted.");
       setDeleteDialog(null);
       await fetchAll();
+      broadcastDailyData();
     } catch {
       toast.error("Failed to delete task.");
     } finally {
@@ -240,6 +257,7 @@ export function DailyTracker() {
     try {
       await togglePlannerTask(pt.id, pt.is_completed);
       await fetchAll();
+      broadcastPlannerTasksUpdate();
       if (!pt.is_completed) toast.success(`"${pt.title}" marked done!`);
       else toast.info(`"${pt.title}" unmarked.`);
     } catch {

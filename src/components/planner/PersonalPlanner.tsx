@@ -58,6 +58,7 @@ export function PersonalPlanner() {
   const [saving, setSaving] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const [hasDeadline, setHasDeadline] = useState(true);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -80,7 +81,12 @@ export function PersonalPlanner() {
 
   useEffect(() => {
     fetchTasks();
+    const handleUpdate = () => fetchTasks();
+    window.addEventListener("planner_tasks_updated", handleUpdate);
+    return () => window.removeEventListener("planner_tasks_updated", handleUpdate);
   }, [fetchTasks]);
+
+  const broadcastTasksUpdate = () => window.dispatchEvent(new CustomEvent("planner_tasks_updated"));
 
   const days = Array.from({ length: DAYS_VISIBLE }, (_, i) =>
     addDays(new Date(), startOffset + i)
@@ -101,7 +107,7 @@ export function PersonalPlanner() {
         title: form.title.trim(),
         description: form.description.trim() || undefined,
         // Convert local datetime string → UTC ISO so Supabase stores the right date
-        deadline: form.deadline ? new Date(form.deadline).toISOString() : undefined,
+        deadline: hasDeadline && form.deadline ? new Date(form.deadline).toISOString() : undefined,
         priority: form.priority,
         category: form.category.trim() || undefined,
       });
@@ -109,6 +115,7 @@ export function PersonalPlanner() {
       setForm({ title: "", description: "", deadline: format(selectedDate, "yyyy-MM-dd") + "T12:00", priority: "medium", category: "" });
       setOpen(false);
       await fetchTasks();
+      broadcastTasksUpdate();
     } catch {
       toast.error("Failed to create task.");
     } finally {
@@ -119,11 +126,13 @@ export function PersonalPlanner() {
   const handleToggle = async (task: Task) => {
     await toggleTask(task.id, !!task.is_completed);
     await fetchTasks();
+    broadcastTasksUpdate();
   };
 
   const handleDelete = async (taskId: string) => {
     await deleteTask(taskId);
     await fetchTasks();
+    broadcastTasksUpdate();
   };
 
   const selectedDayTasks = tasksForDay(selectedDate);
@@ -154,7 +163,10 @@ export function PersonalPlanner() {
               <ChevronRight className="h-4 w-4" />
             </button>
             <Dialog open={open} onOpenChange={(v) => {
-              if (v) setForm((f) => ({ ...f, deadline: format(selectedDate, "yyyy-MM-dd") + "T12:00" }));
+              if (v) {
+                setForm((f) => ({ ...f, deadline: format(selectedDate, "yyyy-MM-dd") + "T12:00" }));
+                setHasDeadline(true);
+              }
               setOpen(v);
             }}>
               <DialogTrigger asChild>
@@ -180,11 +192,18 @@ export function PersonalPlanner() {
                   />
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Deadline</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs text-muted-foreground">Deadline</label>
+                        <label className="text-xs text-muted-foreground flex items-center gap-1 cursor-pointer">
+                          <input type="checkbox" checked={!hasDeadline} onChange={(e) => setHasDeadline(!e.target.checked)} className="h-3 w-3" />
+                          None
+                        </label>
+                      </div>
                       <Input
                         type="datetime-local"
                         value={form.deadline}
                         onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value }))}
+                        disabled={!hasDeadline}
                       />
                     </div>
                     <div>

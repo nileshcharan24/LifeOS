@@ -61,6 +61,7 @@ export function ManageHabits({ onUpdate }: { onUpdate?: () => void }) {
       setForm(DEFAULT_FORM);
       await load();
       onUpdate?.();
+      window.dispatchEvent(new CustomEvent("daily_data_updated"));
     } catch {
       toast.error("Failed to save habit.");
     } finally {
@@ -73,6 +74,7 @@ export function ManageHabits({ onUpdate }: { onUpdate?: () => void }) {
       await updateHabit(h.id, h.name, h.xp_value, !h.enabled);
       await load();
       onUpdate?.();
+      window.dispatchEvent(new CustomEvent("daily_data_updated"));
     } catch {
       toast.error("Failed to update habit.");
     }
@@ -86,6 +88,7 @@ export function ManageHabits({ onUpdate }: { onUpdate?: () => void }) {
       setConfirmDeleteId(null);
       await load();
       onUpdate?.();
+      window.dispatchEvent(new CustomEvent("daily_data_updated"));
     } catch {
       toast.error("Failed to delete habit.");
     } finally {

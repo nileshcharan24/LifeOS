@@ -82,7 +82,19 @@ export function NoteEditor({ note, defaultType = "text", onSave, onCancel }: Pro
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (state.type === "text") textareaRef.current?.focus();
+    if (state.type === "text" && textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+    }
+  }, [state.text, state.type]);
+
+  useEffect(() => {
+    if (state.type === "text" && textareaRef.current) {
+      // Focus on mount or type change, but don't steal focus on every text change
+      if (document.activeElement !== textareaRef.current) {
+        textareaRef.current.focus();
+      }
+    }
   }, [state.type]);
 
   const colorHex = NOTE_COLORS.find((c) => c.key === state.color)?.hex ?? "";
@@ -153,8 +165,7 @@ export function NoteEditor({ note, defaultType = "text", onSave, onCancel }: Pro
             value={state.text}
             onChange={(e) => set("text", e.target.value)}
             placeholder="Take a note…"
-            rows={4}
-            className="w-full bg-transparent text-sm leading-relaxed resize-none focus:outline-none placeholder:text-muted-foreground/60"
+            className="w-full bg-transparent text-sm leading-relaxed min-h-[150px] resize-none focus:outline-none placeholder:text-muted-foreground/60 overflow-hidden"
           />
         ) : (
           <div className="space-y-1.5 py-1">
