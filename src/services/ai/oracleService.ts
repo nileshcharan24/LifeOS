@@ -73,7 +73,6 @@ export async function saveOracleConfig(config: {
       language_tone: config.language_tone as "formal" | "casual" | "motivational" | "analytical",
       comfort_mode_enabled: config.comfort_mode_enabled,
       setup_completed: true,
-      updated_at: new Date().toISOString(),
     }, { onConflict: "profile_id" })
     .select()
     .single();
