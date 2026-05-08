@@ -20,8 +20,9 @@ import { useMode } from "@/context/ModeContext";
 import {
   CheckCircle2, Circle, Calendar, BookMarked, Heart,
   Zap, ShoppingBag, Pencil, ArrowRight, Clock, TrendingUp,
-  AlertCircle, Flame, Sparkles, Lock, MessageSquare,
+  AlertCircle, Flame, Sparkles, Lock, MessageSquare, BookOpen, Briefcase,
 } from "lucide-react";
+import { toast } from "sonner";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -63,11 +64,12 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
   const [instances, setInstances] = useState<HabitInstance[]>([]);
   const [tasks, setTasks]       = useState<DailyTask[]>([]);
   const [loading, setLoading]   = useState(true);
+  const [toggling, setToggling] = useState<string | null>(null);
 
   const today = format(new Date(), "yyyy-MM-dd");
 
   useEffect(() => {
-    (async () => {
+    const fetchData = async () => {
       const [h, inst, t] = await Promise.all([
         getHabits(),
         ensureAndGetHabitInstances(today),
@@ -77,8 +79,45 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
       setInstances(inst);
       setTasks(t);
       setLoading(false);
-    })();
+    };
+
+    fetchData();
+    window.addEventListener("daily_data_updated", fetchData);
+    window.addEventListener("xp_updated", fetchData);
+    return () => {
+      window.removeEventListener("daily_data_updated", fetchData);
+      window.removeEventListener("xp_updated", fetchData);
+    };
   }, [today]);
+
+  const handleToggleHabit = async (habitId: string) => {
+    setToggling(habitId);
+    try {
+      const { completeHabitInstance, uncompleteHabitInstance } = await import("@/services/tasks/taskTrackerService");
+      const instance = instances.find(i => i.habit_id === habitId);
+      const habit = habits.find(h => h.id === habitId);
+      if (instance && habit) {
+        if (instance.completed) {
+          await uncompleteHabitInstance(instance.id);
+        } else {
+          await completeHabitInstance(instance.id, habit.xp_value, habit.name);
+        }
+        const [h, inst, t] = await Promise.all([
+          getHabits(),
+          ensureAndGetHabitInstances(today),
+          getDailyTasksForDate(today),
+        ]);
+        setHabits(h);
+        setInstances(inst);
+        setTasks(t);
+        window.dispatchEvent(new CustomEvent("daily_data_updated"));
+      }
+    } catch (error) {
+      console.error("Failed to toggle habit:", error);
+    } finally {
+      setToggling(null);
+    }
+  };
 
   const completedHabits = instances.filter(i => i.completed).length;
   const completedTasks  = tasks.filter(t => t.is_completed).length;
@@ -119,16 +158,26 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
             {habits.slice(0, 5).map(habit => {
               const inst = instances.find(i => i.habit_id === habit.id);
               const done = inst?.completed ?? false;
+              const isTogglingThis = toggling === habit.id;
               return (
-                <div key={habit.id} className="flex items-center gap-2 text-sm">
-                  {done
-                    ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
-                    : <Circle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
+                <button
+                  key={habit.id}
+                  onClick={() => handleToggleHabit(habit.id)}
+                  disabled={isTogglingThis}
+                  className="flex items-center gap-2 text-sm w-full hover:bg-muted/50 p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                >
+                  {isTogglingThis ? (
+                    <div className="h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin flex-shrink-0" />
+                  ) : done ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                  ) : (
+                    <Circle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                  )}
                   <span className={cn("truncate", done && "line-through text-muted-foreground")}>
                     {habit.name}
                   </span>
                   <span className="ml-auto text-xs text-muted-foreground flex-shrink-0">+{habit.xp_value}</span>
-                </div>
+                </button>
               );
             })}
             {habits.length === 0 && (
@@ -231,26 +280,41 @@ function NegativeHabitsSection({ onNav }: { onNav: (tab: string) => void }) {
 // ─── Section 3: Upcoming Deadlines ────────────────────────────────────────────
 
 function UpcomingDeadlinesSection({ onNav }: { onNav: (tab: string) => void }) {
-  const [tasks, setTasks]   = useState<DailyTask[]>([]);
+  const [tasks, setTasks]   = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      const all: DailyTask[] = [];
-      for (let i = 0; i < 7; i++) {
-        const date = format(addDays(new Date(), i), "yyyy-MM-dd");
-        const dayTasks = await getDailyTasksForDate(date);
-        all.push(...dayTasks.filter(t => !t.is_completed));
-      }
-      // deduplicate by id
-      const seen = new Set<string>();
-      setTasks(all.filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; }));
+    const fetchUpcoming = async () => {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const now = new Date();
+      const today = startOfDay(now).toISOString();
+      const endWindow = endOfDay(addDays(now, 7)).toISOString();
+
+      const { data } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("profile_id", user.id)
+        .eq("is_completed", false)
+        .not("deadline", "is", null)
+        .gte("deadline", today)
+        .lte("deadline", endWindow)
+        .order("deadline", { ascending: true });
+
+      if (data) setTasks(data);
       setLoading(false);
-    })();
+    };
+
+    fetchUpcoming();
+    window.addEventListener("planner_tasks_updated", fetchUpcoming);
+    return () => window.removeEventListener("planner_tasks_updated", fetchUpcoming);
   }, []);
 
-  const byDay = tasks.reduce<Record<string, DailyTask[]>>((acc, task) => {
-    const key = task.task_date;
+  const byDay = tasks.reduce<Record<string, any[]>>((acc, task) => {
+    const key = format(new Date(task.deadline), "yyyy-MM-dd");
     if (!acc[key]) acc[key] = [];
     acc[key].push(task);
     return acc;
@@ -281,12 +345,15 @@ function UpcomingDeadlinesSection({ onNav }: { onNav: (tab: string) => void }) {
                 {byDay[day].slice(0, 3).map(task => (
                   <div key={task.id} className="flex items-center gap-2 text-sm">
                     <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                    <span className="truncate">{task.name}</span>
-                    <Badge variant="outline" className={cn("text-[10px] px-1 py-0 ml-auto flex-shrink-0", urgencyColor(task.urgency))}>
-                      {task.urgency}
+                    <span className="truncate flex-1">{task.title}</span>
+                    <Badge variant="outline" className={cn("text-[10px] px-1 py-0 ml-auto flex-shrink-0", urgencyColor(task.priority ?? "medium"))}>
+                      {task.priority ?? "medium"}
                     </Badge>
                   </div>
                 ))}
+                {byDay[day].length > 3 && (
+                  <p className="text-xs text-muted-foreground text-center pt-1">+{byDay[day].length - 3} more</p>
+                )}
               </div>
             </div>
           ))}
@@ -301,66 +368,171 @@ function UpcomingDeadlinesSection({ onNav }: { onNav: (tab: string) => void }) {
   );
 }
 
+// ─── Section 3.5: Unscheduled Tasks ───────────────────────────────────────────
+
+function UnscheduledTasksSection({ onNav }: { onNav: (tab: string) => void }) {
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUnscheduled = async () => {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("profile_id", user.id)
+        .is("deadline", null)
+        .eq("is_completed", false)
+        .order("created_at", { ascending: false });
+        
+      if (data) setTasks(data);
+      setLoading(false);
+    };
+
+    fetchUnscheduled();
+    window.addEventListener("planner_tasks_updated", fetchUnscheduled);
+    return () => window.removeEventListener("planner_tasks_updated", fetchUnscheduled);
+  }, []);
+
+  return (
+    <SectionCard title="Unscheduled Tasks" icon={<CheckCircle2 className="h-4 w-4" />}>
+      {loading ? (
+        <div className="text-sm text-muted-foreground">Loading...</div>
+      ) : tasks.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No unscheduled tasks.</p>
+      ) : (
+        <div className="space-y-2">
+          {tasks.slice(0, 5).map(task => (
+            <div key={task.id} className="flex items-center gap-2 text-sm">
+              <Circle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="truncate flex-1">{task.title}</span>
+              <Badge variant="outline" className={cn("text-[10px] px-1 py-0 flex-shrink-0", urgencyColor(task.priority ?? "medium"))}>
+                {task.priority ?? "medium"}
+              </Badge>
+            </div>
+          ))}
+          {tasks.length > 5 && (
+            <p className="text-xs text-muted-foreground text-center pt-1">+{tasks.length - 5} more</p>
+          )}
+        </div>
+      )}
+      <div className="mt-4 pt-3 border-t border-border/40">
+        <Button size="sm" variant="outline" onClick={() => onNav("planner")}>
+          Go to Planner <ArrowRight className="h-3 w-3 ml-1" />
+        </Button>
+      </div>
+    </SectionCard>
+  );
+}
+
 // ─── Section 4: Today's Journal ───────────────────────────────────────────────
 
 function JournalTodaySection({ onNav }: { onNav: (tab: string) => void }) {
   const [entry, setEntry] = useState<any | null>(null);
+  const [content, setContent] = useState("");
+  const [mood, setMood] = useState(5);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const result = await getJournalEntries();
-        const todayEntry = (result.data ?? []).find((e: any) => {
-          const dateStr = e.created_at?.split("T")[0];
-          return dateStr === todayStr;
-        });
-        setEntry(todayEntry ?? null);
-      } catch {
+  const fetchEntry = useCallback(async () => {
+    try {
+      const result = await getJournalEntries();
+      const todayEntry = (result.data ?? []).find((e: any) => {
+        const dateStr = e.created_at?.split("T")[0];
+        return dateStr === todayStr;
+      });
+      if (todayEntry) {
+        setEntry(todayEntry);
+        setContent(todayEntry.content || "");
+        setMood(todayEntry.mood_score || 5);
+      } else {
         setEntry(null);
+        setContent("");
+        setMood(5);
       }
-      setLoading(false);
-    })();
+    } catch {
+      setEntry(null);
+    }
+    setLoading(false);
   }, [todayStr]);
+
+  useEffect(() => {
+    fetchEntry();
+  }, [fetchEntry]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      if (entry) {
+        await supabase.from("journal_entries").update({
+          content,
+          mood_score: mood
+        }).eq("id", entry.id);
+      } else {
+        await supabase.from("journal_entries").insert({
+          profile_id: user.id,
+          content,
+          mood_score: mood,
+          is_encrypted: false
+        });
+      }
+      // Re-fetch to update state
+      await fetchEntry();
+    } catch {
+      // ignore
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <SectionCard title="Today's Journal" icon={<BookMarked className="h-4 w-4" />}>
       {loading ? (
         <div className="text-sm text-muted-foreground">Loading...</div>
-      ) : entry ? (
+      ) : (
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">{moodEmoji(entry.mood_score ?? 5)}</span>
-            <div>
-              <p className="text-sm font-medium">Mood: {entry.mood_score ?? "—"}/10</p>
-              {entry.mood_tags?.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {entry.mood_tags.map((tag: string) => (
-                    <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">{tag}</Badge>
-                  ))}
-                </div>
-              )}
+            <span className="text-2xl">{moodEmoji(mood)}</span>
+            <div className="flex-1 flex items-center gap-2">
+              <span className="text-sm font-medium whitespace-nowrap">Mood: {mood}/10</span>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={mood}
+                onChange={(e) => setMood(parseInt(e.target.value))}
+                className="w-full h-1 bg-muted rounded-lg appearance-none cursor-pointer"
+              />
             </div>
           </div>
-          {entry.content && (
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {entry.content.slice(0, 120)}{entry.content.length > 120 ? "..." : ""}
-            </p>
-          )}
+          <textarea
+            className="w-full min-h-[80px] p-3 text-sm rounded-md bg-muted/40 border border-border/40 focus:outline-none focus:ring-1 focus:ring-primary resize-none placeholder:text-muted-foreground/60"
+            placeholder="How are you feeling today?"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+          />
         </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">No journal entry for today yet.</p>
       )}
-      <div className="mt-4 pt-3 border-t border-border/40 flex gap-2">
-        <Button size="sm" variant="outline" onClick={() => onNav("journal")}>
-          <Pencil className="h-3 w-3 mr-1" />
-          {entry ? "Edit Entry" : "Write Entry"}
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => onNav("journal")}>
-          All Entries <ArrowRight className="h-3 w-3 ml-1" />
-        </Button>
+      <div className="mt-4 pt-3 border-t border-border/40 flex items-center justify-between">
+        <div className="flex gap-2">
+          <Button size="sm" onClick={handleSave} disabled={saving || !content.trim() || loading}>
+            {saving ? "Saving..." : "Save"}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => onNav("journal")}>
+            Full Journal <ArrowRight className="h-3 w-3 ml-1" />
+          </Button>
+        </div>
       </div>
     </SectionCard>
   );
@@ -371,20 +543,53 @@ function JournalTodaySection({ onNav }: { onNav: (tab: string) => void }) {
 function HealthSnapshotSection({ onNav }: { onNav: (tab: string) => void }) {
   const [exerciseLogs, setExerciseLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addingExercise, setAddingExercise] = useState(false);
+  const [exerciseType, setExerciseType] = useState("");
+  const [duration, setDuration] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const today = format(new Date(), "yyyy-MM-dd");
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const logs = await getExerciseLogs(today);
-        setExerciseLogs(logs);
-      } catch {
-        setExerciseLogs([]);
-      }
-      setLoading(false);
-    })();
+  const fetchHealth = useCallback(async () => {
+    try {
+      const logs = await getExerciseLogs(today);
+      setExerciseLogs(logs);
+    } catch {
+      setExerciseLogs([]);
+    }
+    setLoading(false);
   }, [today]);
+
+  useEffect(() => {
+    fetchHealth();
+  }, [fetchHealth]);
+
+  const handleSaveExercise = async () => {
+    if (!exerciseType || !duration) return;
+    setSaving(true);
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      await supabase.from("exercise_logs").insert({
+        profile_id: user.id,
+        date: today,
+        activity_type: exerciseType,
+        duration_minutes: parseInt(duration),
+        intensity: "moderate"
+      });
+      setAddingExercise(false);
+      setExerciseType("");
+      setDuration("");
+      await fetchHealth();
+    } catch {
+      // ignore
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const totalDuration = exerciseLogs.reduce((sum, l) => sum + (l.duration_minutes ?? 0), 0);
   const exerciseTypes = [...new Set(exerciseLogs.map(l => l.activity_type).filter(Boolean))];
@@ -393,9 +598,38 @@ function HealthSnapshotSection({ onNav }: { onNav: (tab: string) => void }) {
     <SectionCard title="Health Snapshot" icon={<Heart className="h-4 w-4" />}>
       {loading ? (
         <div className="text-sm text-muted-foreground">Loading...</div>
+      ) : addingExercise ? (
+        <div className="space-y-3 bg-muted/40 p-3 rounded-lg border border-border/40">
+          <p className="text-sm font-semibold">Quick Log Exercise</p>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="e.g. Running"
+              value={exerciseType}
+              onChange={e => setExerciseType(e.target.value)}
+              className="h-8 px-2 text-sm rounded bg-background border focus:outline-none focus:ring-1"
+            />
+            <input
+              type="number"
+              placeholder="Minutes"
+              value={duration}
+              onChange={e => setDuration(e.target.value)}
+              className="h-8 px-2 text-sm rounded bg-background border focus:outline-none focus:ring-1"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleSaveExercise} disabled={saving || !exerciseType || !duration}>
+              {saving ? "..." : "Save"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setAddingExercise(false)}>Cancel</Button>
+          </div>
+        </div>
       ) : (
         <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-lg border border-border/40 bg-muted/30 p-3 text-center">
+          <div
+            onClick={() => setAddingExercise(true)}
+            className="rounded-lg border border-border/40 bg-muted/30 p-3 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+          >
             <p className="text-xs text-muted-foreground mb-1">Exercise</p>
             {exerciseLogs.length > 0 ? (
               <>
@@ -405,22 +639,239 @@ function HealthSnapshotSection({ onNav }: { onNav: (tab: string) => void }) {
                 </p>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">—</p>
+              <p className="text-sm text-primary font-medium mt-1">+ Log</p>
             )}
           </div>
-          <div className="rounded-lg border border-border/40 bg-muted/30 p-3 text-center">
+          <div
+            onClick={() => onNav("health")}
+            className="rounded-lg border border-border/40 bg-muted/30 p-3 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+          >
             <p className="text-xs text-muted-foreground mb-1">Food</p>
-            <p className="text-sm text-muted-foreground">Log in Health</p>
+            <p className="text-sm text-muted-foreground mt-1">Log &rarr;</p>
           </div>
-          <div className="rounded-lg border border-border/40 bg-muted/30 p-3 text-center">
+          <div
+            onClick={() => onNav("health")}
+            className="rounded-lg border border-border/40 bg-muted/30 p-3 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+          >
             <p className="text-xs text-muted-foreground mb-1">Sleep</p>
-            <p className="text-sm text-muted-foreground">Log in Health</p>
+            <p className="text-sm text-muted-foreground mt-1">Log &rarr;</p>
           </div>
         </div>
       )}
       <div className="mt-4 pt-3 border-t border-border/40">
         <Button size="sm" variant="outline" onClick={() => onNav("health")}>
-          Health Tracker <ArrowRight className="h-3 w-3 ml-1" />
+          Full Health Tracker <ArrowRight className="h-3 w-3 ml-1" />
+        </Button>
+      </div>
+    </SectionCard>
+  );
+}
+
+// ─── Section 5.6: Career Snapshot ──────────────────────────────────────────────
+
+function CareerSnapshotSection({ onNav }: { onNav: (tab: string) => void }) {
+  const [roles, setRoles] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const today = format(new Date(), "yyyy-MM-dd");
+
+  const fetchCareer = useCallback(async () => {
+    try {
+      const { getRoles, getSessionsForDate } = await import("@/services/career/careerService");
+      const r = await getRoles();
+      const s = await getSessionsForDate(today);
+      setRoles(r.filter(x => x.is_active));
+      setSessions(s);
+    } catch {
+      // ignore
+    }
+    setLoading(false);
+  }, [today]);
+
+  useEffect(() => {
+    fetchCareer();
+  }, [fetchCareer]);
+
+  const handleClockIn = async (roleId: string, roleTitle: string) => {
+    setSaving(roleId);
+    try {
+      const { clockIn } = await import("@/services/career/careerService");
+      const result = await clockIn(roleId, roleTitle, today);
+      if (result.xpGranted) {
+        toast.success(`Clocked in! +${result.xp} XP`);
+        window.dispatchEvent(new CustomEvent("xp_updated"));
+      } else {
+        toast.success("Already clocked in for today.");
+      }
+      await fetchCareer();
+    } catch {
+      toast.error("Clock-in failed.");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleClockOut = async (roleId: string) => {
+    setSaving(roleId);
+    try {
+      const { clockOut } = await import("@/services/career/careerService");
+      // Just sending 0 or asking user for minutes could be complex,
+      // For quick action, let's just mark clocked_out (we need duration... let's just send 60 mins for quick logging)
+      // Wait, let's just open the career tab if they need to enter duration,
+      // or we can prompt them. For now, simple fixed duration or switch to full tracker.
+      toast.info("Please use the full Career Tracker to log hours.");
+      onNav("career");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  return (
+    <SectionCard title="Career / Work" icon={<Briefcase className="h-4 w-4" />}>
+      {loading ? (
+        <div className="text-sm text-muted-foreground">Loading...</div>
+      ) : roles.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No active work roles found.</p>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Quick Clock-in</p>
+          <div className="space-y-2">
+            {roles.slice(0, 3).map(role => {
+              const session = sessions.find(s => s.role_id === role.id);
+              const isClockedIn = session?.clocked_in;
+              return (
+                <div key={role.id} className="flex items-center justify-between p-2 rounded-lg border border-border/40 bg-muted/20">
+                  <div className="flex flex-col min-w-0 flex-1 pr-2">
+                    <span className="text-sm font-medium truncate">{role.title}</span>
+                    {role.company && <span className="text-[10px] text-muted-foreground truncate">{role.company}</span>}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={isClockedIn ? "secondary" : "default"}
+                    className={cn("h-7 text-xs px-3", isClockedIn && "bg-green-500/10 text-green-600 hover:bg-green-500/20")}
+                    onClick={() => isClockedIn ? handleClockOut(role.id) : handleClockIn(role.id, role.title)}
+                    disabled={saving === role.id}
+                  >
+                    {saving === role.id ? "..." : isClockedIn ? "Clocked In" : "Clock In"}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <div className="mt-4 pt-3 border-t border-border/40">
+        <Button size="sm" variant="outline" onClick={() => onNav("career")}>
+          Full Career Tracker <ArrowRight className="h-3 w-3 ml-1" />
+        </Button>
+      </div>
+    </SectionCard>
+  );
+}
+
+// ─── Section 6: XP & Level ────────────────────────────────────────────────────
+
+// ─── Section 5.5: Academic Snapshot ───────────────────────────────────────────
+
+function AcademicSnapshotSection({ onNav }: { onNav: (tab: string) => void }) {
+  const [courses, setCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const today = format(new Date(), "yyyy-MM-dd");
+
+  const fetchAcademic = useCallback(async () => {
+    try {
+      const { getSemesters, getCoursesBySemester, getClassInstancesByDate } = await import("@/services/academic/academicService");
+      const semesters = await getSemesters();
+      const activeSem = semesters.find((s: any) => s.status === "active");
+      if (activeSem) {
+        const semesterCourses = await getCoursesBySemester(activeSem.id);
+        
+        // Find if they were attended today
+        const coursesWithStatus = await Promise.all(semesterCourses.map(async (c: any) => {
+          const inst = await getClassInstancesByDate(c.id, today);
+          return { ...c, todayInstance: inst };
+        }));
+        
+        setCourses(coursesWithStatus);
+      }
+    } catch {
+      // ignore
+    }
+    setLoading(false);
+  }, [today]);
+
+  useEffect(() => {
+    fetchAcademic();
+  }, [fetchAcademic]);
+
+  const handleLogAttendance = async (courseId: string, status: "attended" | "missed" | "od") => {
+    setSaving(courseId);
+    try {
+      const { createClassInstance, updateClassInstanceStatus } = await import("@/services/academic/academicService");
+      const course = courses.find(c => c.id === courseId);
+      if (course?.todayInstance) {
+        await updateClassInstanceStatus(course.todayInstance.id, status);
+      } else {
+        await createClassInstance(courseId, today, status);
+      }
+      await fetchAcademic();
+    } catch {
+      // ignore
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  return (
+    <SectionCard title="Academic Snapshot" icon={<BookOpen className="h-4 w-4" />}>
+      {loading ? (
+        <div className="text-sm text-muted-foreground">Loading...</div>
+      ) : courses.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No active semester or courses found.</p>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Quick Log Today's Classes</p>
+          <div className="space-y-2">
+            {courses.slice(0, 4).map(course => {
+              const inst = course.todayInstance;
+              return (
+                <div key={course.id} className="flex items-center justify-between p-2 rounded-lg border border-border/40 bg-muted/20">
+                  <div className="flex flex-col min-w-0 flex-1 pr-2">
+                    <span className="text-sm font-medium truncate">{course.code || course.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      variant={inst?.status === "attended" ? "default" : "outline"}
+                      className={cn("h-7 text-xs px-2", inst?.status === "attended" && "bg-green-500 hover:bg-green-600")}
+                      onClick={() => handleLogAttendance(course.id, "attended")}
+                      disabled={saving === course.id}
+                    >
+                      {saving === course.id ? "..." : "Attended"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={inst?.status === "missed" ? "default" : "outline"}
+                      className={cn("h-7 text-xs px-2", inst?.status === "missed" && "bg-red-500 hover:bg-red-600")}
+                      onClick={() => handleLogAttendance(course.id, "missed")}
+                      disabled={saving === course.id}
+                    >
+                      Missed
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <div className="mt-4 pt-3 border-t border-border/40 flex gap-2">
+        <Button size="sm" variant="outline" onClick={() => onNav("academic")}>
+          Full Academic Tracker <ArrowRight className="h-3 w-3 ml-1" />
         </Button>
       </div>
     </SectionCard>
@@ -530,6 +981,8 @@ interface DashboardHubProps {
 }
 
 export function DashboardHub({ onNav }: DashboardHubProps) {
+  const { isDeepMode } = useMode();
+
   return (
     <div className="space-y-5 max-w-5xl">
       <div>
@@ -538,8 +991,11 @@ export function DashboardHub({ onNav }: DashboardHubProps) {
       </div>
 
       <DailyHabitsTasksSection onNav={onNav} />
-      <NegativeHabitsSection onNav={onNav} />
-      <UpcomingDeadlinesSection onNav={onNav} />
+      {isDeepMode && <NegativeHabitsSection onNav={onNav} />}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <UpcomingDeadlinesSection onNav={onNav} />
+        <UnscheduledTasksSection onNav={onNav} />
+      </div>
       <JournalTodaySection onNav={onNav} />
       <HealthSnapshotSection onNav={onNav} />
       <XPLevelSection onNav={onNav} />
