@@ -2,11 +2,14 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { Database } from "@/types/database.types";
+
+type TableNames = keyof Database['public']['Tables'];
 
 export type ArchivedItem = {
   id: string;
   user_id: string;
-  item_type: string;
+  item_type: TableNames;
   item_data: any;
   archived_at: string;
   expires_at: string;
@@ -52,7 +55,7 @@ export async function restoreItem(item: ArchivedItem) {
   if (!user) throw new Error("Not authenticated");
 
   // Re-insert the item into its original table
-  const { error: insertError } = await supabase.from(item.item_type === "daily_task" ? "daily_tasks" : item.item_type).insert([item.item_data]);
+  const { error: insertError } = await supabase.from(item.item_type === "daily_tasks" ? "daily_tasks" : item.item_type).insert([item.item_data]);
   if (insertError) throw insertError;
   
   // Delete the item from the archive
