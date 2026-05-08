@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { format, addDays, isToday, parseISO, startOfDay, endOfDay } from "date-fns";
+import { format, addDays, isToday, parseISO } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useRealtimeXP } from "@/hooks/useRealtimeXP";
@@ -154,34 +154,39 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
         {/* Habits mini list */}
         <div>
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Habits</p>
-          <div className="space-y-1.5">
-            {habits.slice(0, 5).map(habit => {
-              const inst = instances.find(i => i.habit_id === habit.id);
-              const done = inst?.completed ?? false;
-              const isTogglingThis = toggling === habit.id;
-              return (
-                <button
-                  key={habit.id}
-                  onClick={() => handleToggleHabit(habit.id)}
-                  disabled={isTogglingThis}
-                  className="flex items-center gap-2 text-sm w-full hover:bg-muted/50 p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left"
-                >
-                  {isTogglingThis ? (
-                    <div className="h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin flex-shrink-0" />
-                  ) : done ? (
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
-                  ) : (
-                    <Circle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                  )}
-                  <span className={cn("truncate", done && "line-through text-muted-foreground")}>
-                    {habit.name}
-                  </span>
-                  <span className="ml-auto text-xs text-muted-foreground flex-shrink-0">+{habit.xp_value}</span>
-                </button>
-              );
-            })}
-            {habits.length === 0 && (
+          <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-2">
+            {habits.length === 0 ? (
               <p className="text-xs text-muted-foreground">No habits yet</p>
+            ) : (
+              [...habits].sort((a, b) => {
+                const aCompleted = instances.find(i => i.habit_id === a.id)?.completed ?? false;
+                const bCompleted = instances.find(i => i.habit_id === b.id)?.completed ?? false;
+                return aCompleted === bCompleted ? 0 : aCompleted ? 1 : -1;
+              }).map(habit => {
+                const inst = instances.find(i => i.habit_id === habit.id);
+                const done = inst?.completed ?? false;
+                const isTogglingThis = toggling === habit.id;
+                return (
+                  <button
+                    key={habit.id}
+                    onClick={() => handleToggleHabit(habit.id)}
+                    disabled={isTogglingThis}
+                    className="flex items-center gap-2 text-sm w-full hover:bg-muted/50 p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                  >
+                    {isTogglingThis ? (
+                      <div className="h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin flex-shrink-0" />
+                    ) : done ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                    ) : (
+                      <Circle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                    )}
+                    <span className={cn("truncate", done && "line-through text-muted-foreground")}>
+                      {habit.name}
+                    </span>
+                    <span className="ml-auto text-xs text-muted-foreground flex-shrink-0">+{habit.xp_value}</span>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
@@ -291,8 +296,7 @@ function UpcomingDeadlinesSection({ onNav }: { onNav: (tab: string) => void }) {
       if (!user) return;
 
       const now = new Date();
-      const today = startOfDay(now).toISOString();
-      const endWindow = endOfDay(addDays(now, 7)).toISOString();
+      const endWindow = addDays(now, 7);
 
       const { data } = await supabase
         .from("tasks")
@@ -300,11 +304,16 @@ function UpcomingDeadlinesSection({ onNav }: { onNav: (tab: string) => void }) {
         .eq("profile_id", user.id)
         .eq("is_completed", false)
         .not("deadline", "is", null)
-        .gte("deadline", today)
-        .lte("deadline", endWindow)
+        .lte("deadline", endWindow.toISOString())
         .order("deadline", { ascending: true });
 
-      if (data) setTasks(data);
+      if (data) {
+        setTasks(data.filter(t => {
+          if (!t.deadline) return false;
+          const deadline = new Date(t.deadline);
+          return deadline >= new Date(format(now, "yyyy-MM-dd"));
+        }));
+      }
       setLoading(false);
     };
 
