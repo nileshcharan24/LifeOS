@@ -16,10 +16,11 @@ import {
 import { getJournalEntries } from "@/services/journal/journalService";
 import { getExerciseLogs } from "@/services/health/healthService";
 import { cn } from "@/lib/utils";
+import { useMode } from "@/context/ModeContext";
 import {
   CheckCircle2, Circle, Calendar, BookMarked, Heart,
   Zap, ShoppingBag, Pencil, ArrowRight, Clock, TrendingUp,
-  AlertCircle, Flame,
+  AlertCircle, Flame, Sparkles, Lock, MessageSquare,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -481,6 +482,47 @@ function XPLevelSection({ onNav }: { onNav: (tab: string) => void }) {
   );
 }
 
+// ─── Section 7: Oracle ───────────────────────────────────────────────────────
+
+function OracleSection({ onNav }: { onNav: (tab: string) => void }) {
+  const { isDeepMode } = useMode();
+
+  return (
+    <SectionCard title="Oracle — AI Life Coach" icon={<Sparkles className="h-4 w-4" />}>
+      {isDeepMode ? (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Your AI coach is ready. Chat about your day, get a diagnosis, or request a weekly review.
+          </p>
+          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1"><MessageSquare className="h-3 w-3" /> Chat</span>
+            <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" /> Day Diagnosis</span>
+            <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Weekly Review</span>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-start gap-3">
+          <div className="rounded-full bg-muted p-2 flex-shrink-0">
+            <Lock className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">Deep Mode required</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Enable Deep Mode to unlock the Oracle AI coach — personalised diagnosis, weekly reviews, and private chat.
+            </p>
+          </div>
+        </div>
+      )}
+      <div className="mt-4 pt-3 border-t border-border/40">
+        <Button size="sm" variant="outline" onClick={() => onNav("oracle")} disabled={!isDeepMode}>
+          <Sparkles className="h-3 w-3 mr-1" />
+          {isDeepMode ? "Open Oracle" : "Locked — Enable Deep Mode"}
+        </Button>
+      </div>
+    </SectionCard>
+  );
+}
+
 // ─── Main Dashboard Hub ───────────────────────────────────────────────────────
 
 interface DashboardHubProps {
@@ -501,6 +543,7 @@ export function DashboardHub({ onNav }: DashboardHubProps) {
       <JournalTodaySection onNav={onNav} />
       <HealthSnapshotSection onNav={onNav} />
       <XPLevelSection onNav={onNav} />
+      <OracleSection onNav={onNav} />
     </div>
   );
 }

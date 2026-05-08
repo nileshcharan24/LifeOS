@@ -6,26 +6,18 @@ import { createClient } from "@/lib/supabase/server";
 export default async function HomePage() {
   const supabase = await createClient();
 
+  // getUser() validates the token server-side; getSession() only reads cookies
+  // and will not detect a stale/invalid refresh token until the server rejects it.
   const {
-    data: { session },
+    data: { user },
     error,
-  } = await supabase.auth.getSession();
+  } = await supabase.auth.getUser();
 
-  // If session retrieval failed, fail open to landing page
   if (error) {
-    console.error("Error checking session on landing:", error.message);
-  } else if (session) {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (!userError && user) {
-      redirect("/dashboard");
-    } else {
-      // Clear stale/invalid session and stay on landing
-      await supabase.auth.signOut();
-    }
+    // Stale or invalid session — clear cookies so the error doesn't recur
+    await supabase.auth.signOut();
+  } else if (user) {
+    redirect("/dashboard");
   }
 
   return (

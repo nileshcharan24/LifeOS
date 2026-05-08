@@ -36,7 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "notes",     label: "Notes",              icon: FileText },
   { id: "growth",    label: "Growth & Vault",     icon: Trophy },
   { id: "career",    label: "Career / Work",      icon: Briefcase },
-  { id: "oracle",    label: "Oracle",             icon: Sparkles, deepOnly: true },
+  { id: "oracle",    label: "Oracle",             icon: Sparkles },
   { id: "about",     label: "About Me",           icon: UserCircle, deepOnly: true },
   { id: "settings",  label: "Settings",           icon: Settings },
 ];
@@ -158,7 +158,9 @@ export function Sidebar({ activeTab, onTabChange, isDeepMode }: SidebarProps) {
                   <>
                     <span className="truncate">{item.label}</span>
                     {item.id === "oracle" && (
-                      <span className="ml-auto text-[10px] text-red-500 font-bold flex-shrink-0">ACTIVE</span>
+                      isDeepMode
+                        ? <span className="ml-auto text-[10px] text-red-500 font-bold flex-shrink-0">ACTIVE</span>
+                        : <span className="ml-auto text-[10px] text-muted-foreground flex-shrink-0">🔒</span>
                     )}
                   </>
                 )}
