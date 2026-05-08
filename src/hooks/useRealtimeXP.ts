@@ -4,12 +4,12 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { calcXPSummary, MILESTONE_LEVELS } from "@/lib/xp";
 
-const supabase = createClient();
-
 export function useRealtimeXP() {
   const { user } = useAuth();
   const [totalXp, setTotalXp] = useState(0);
   const prevLevelRef = useRef(1);
+  const channelRef = useRef<any>(null); // Use useRef to store the channel
+  const supabase = createClient(); // Initialize Supabase client here
 
   const applyXP = (xp: number, showToast = false) => {
     const { level } = calcXPSummary(xp);
@@ -27,8 +27,17 @@ export function useRealtimeXP() {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      // Clean up on user logout
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      setTotalXp(0);
+      return;
+    }
 
+    // Initial fetch of XP
     supabase
       .from("profiles")
       .select("total_xp")
@@ -38,6 +47,7 @@ export function useRealtimeXP() {
         if (data) applyXP(data.total_xp, false);
       });
 
+    // Handle custom 'xp_updated' event
     const handleXpUpdated = () => {
       supabase
         .from("profiles")
@@ -46,10 +56,16 @@ export function useRealtimeXP() {
         .single()
         .then(({ data }) => { if (data) applyXP(data.total_xp, true); });
     };
-
     window.addEventListener("xp_updated", handleXpUpdated);
 
-    const channel = supabase
+    // Setup Realtime Channel
+    if (channelRef.current) {
+      // If channel already exists, remove it before creating a new one
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    channelRef.current = supabase
       .channel(`profile_xp_${user.id}`)
       .on(
         "postgres_changes",
@@ -63,9 +79,11 @@ export function useRealtimeXP() {
 
     return () => {
       window.removeEventListener("xp_updated", handleXpUpdated);
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   const summary = calcXPSummary(totalXp);
