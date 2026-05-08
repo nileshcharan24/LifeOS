@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -40,6 +40,40 @@ export interface Database {
           }
         ]
       }
+      archived_items: {
+       Row: {
+         id: string
+         user_id: string
+         item_type: string
+         item_data: Json
+         archived_at: string
+         expires_at: string
+       }
+       Insert: {
+         id?: string
+         user_id: string
+         item_type: string
+         item_data: Json
+         archived_at?: string
+         expires_at: string
+       }
+       Update: {
+         id?: string
+         user_id?: string
+         item_type?: string
+         item_data?: Json
+         archived_at?: string
+         expires_at?: string
+       }
+       Relationships: [
+         {
+           foreignKeyName: "archived_items_user_id_fkey"
+           columns: ["user_id"]
+           referencedRelation: "profiles"
+           referencedColumns: ["id"]
+         }
+       ]
+     }
       journal_entries: {
         Row: {
           content: string
