@@ -673,22 +673,27 @@ export async function getTrackerStats(date: string) {
   const tasksCompleted  = (tasks || []).filter((t: any) => t.is_completed).length;
   const totalTasks      = (tasks || []).length;
 
-  const xpFromHabits   = (xpToday || []).filter((x: any) => x.category === "habit"    && x.amount > 0).reduce((s: number, x: any) => s + x.amount, 0);
-  const xpFromTasks    = (xpToday || []).filter((x: any) => x.category === "task"     && x.amount > 0).reduce((s: number, x: any) => s + x.amount, 0);
-  const xpFromAcademic = (xpToday || []).filter((x: any) => x.category === "academic" && x.amount > 0).reduce((s: number, x: any) => s + x.amount, 0);
-  const xpFromBonuses  = (xpToday || []).filter((x: any) => x.category === "bonus"    && x.amount > 0).reduce((s: number, x: any) => s + x.amount, 0);
+  const pos = (xpToday || []).filter((x: any) => x.amount > 0);
+  const xpFromHabits   = pos.filter((x: any) => x.category === "habit"   ).reduce((s: number, x: any) => s + x.amount, 0);
+  const xpFromTasks    = pos.filter((x: any) => x.category === "task"    ).reduce((s: number, x: any) => s + x.amount, 0);
+  const xpFromAcademic = pos.filter((x: any) => x.category === "academic").reduce((s: number, x: any) => s + x.amount, 0);
+  const xpFromHealth   = pos.filter((x: any) => x.category === "health"  ).reduce((s: number, x: any) => s + x.amount, 0);
+  const xpFromCareer   = pos.filter((x: any) => x.category === "career"  ).reduce((s: number, x: any) => s + x.amount, 0);
+  const xpFromBonuses  = pos.filter((x: any) => x.category === "bonus"   ).reduce((s: number, x: any) => s + x.amount, 0);
 
   return {
     habitsCompleted,
     totalHabits,
     tasksCompleted,
     totalTasks,
-    totalXp: xpFromHabits + xpFromTasks + xpFromAcademic + xpFromBonuses,
+    totalXp: xpFromHabits + xpFromTasks + xpFromAcademic + xpFromHealth + xpFromCareer + xpFromBonuses,
     xpBreakdown: {
-      habits: xpFromHabits,
-      tasks: xpFromTasks,
+      habits:   xpFromHabits,
+      tasks:    xpFromTasks,
       academic: xpFromAcademic,
-      bonuses: xpFromBonuses,
+      health:   xpFromHealth,
+      career:   xpFromCareer,
+      bonuses:  xpFromBonuses,
     },
     perfectDay:    totalHabits > 0 && habitsCompleted === totalHabits,
     productiveDay: totalTasks  > 0 && tasksCompleted  === totalTasks,
@@ -725,4 +730,92 @@ export async function getHabitRates(days: number) {
       rate:      total > 0 ? Math.round((completed / total) * 100) : 0,
     };
   });
+}
+
+// ─── Range Stats (for calendar date-picker) ───────────────────────────────────
+
+export async function getTrackerStatsForRange(startDate: string, endDate: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const rangeStart = `${startDate}T00:00:00`;
+  const rangeEnd   = `${endDate}T23:59:59`;
+
+  const [{ data: instances }, { data: tasks }, { data: xpRows }] = await Promise.all([
+    supabase
+      .from("habit_instances")
+      .select("completed, xp_earned, date")
+      .eq("profile_id", user.id)
+      .gte("date", startDate)
+      .lte("date", endDate),
+    supabase
+      .from("daily_tasks")
+      .select("is_completed, xp_earned, task_date, urgency")
+      .eq("user_id", user.id)
+      .gte("task_date", startDate)
+      .lte("task_date", endDate),
+    supabase
+      .from("xp_transactions")
+      .select("amount, reason, category, created_at")
+      .eq("profile_id", user.id)
+      .gte("created_at", rangeStart)
+      .lte("created_at", rangeEnd),
+  ]);
+
+  const habitsCompleted = (instances || []).filter((i: any) => i.completed).length;
+  const totalHabits     = (instances || []).length;
+  const tasksCompleted  = (tasks || []).filter((t: any) => t.is_completed).length;
+  const totalTasks      = (tasks || []).length;
+
+  const pos = (xpRows || []).filter((x: any) => x.amount > 0);
+  const xpFromHabits   = pos.filter((x: any) => x.category === "habit"   ).reduce((s: number, x: any) => s + x.amount, 0);
+  const xpFromTasks    = pos.filter((x: any) => x.category === "task"    ).reduce((s: number, x: any) => s + x.amount, 0);
+  const xpFromAcademic = pos.filter((x: any) => x.category === "academic").reduce((s: number, x: any) => s + x.amount, 0);
+  const xpFromHealth   = pos.filter((x: any) => x.category === "health"  ).reduce((s: number, x: any) => s + x.amount, 0);
+  const xpFromCareer   = pos.filter((x: any) => x.category === "career"  ).reduce((s: number, x: any) => s + x.amount, 0);
+  const xpFromBonuses  = pos.filter((x: any) => x.category === "bonus"   ).reduce((s: number, x: any) => s + x.amount, 0);
+
+  return {
+    habitsCompleted,
+    totalHabits,
+    tasksCompleted,
+    totalTasks,
+    habitRate: totalHabits > 0 ? Math.round((habitsCompleted / totalHabits) * 100) : 0,
+    taskRate:  totalTasks  > 0 ? Math.round((tasksCompleted  / totalTasks)  * 100) : 0,
+    totalXp: xpFromHabits + xpFromTasks + xpFromAcademic + xpFromHealth + xpFromCareer + xpFromBonuses,
+    xpBreakdown: {
+      habits:   xpFromHabits,
+      tasks:    xpFromTasks,
+      academic: xpFromAcademic,
+      health:   xpFromHealth,
+      career:   xpFromCareer,
+      bonuses:  xpFromBonuses,
+    },
+  };
+}
+
+export async function getHabitRatesForRange(startDate: string, endDate: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const [{ data: habits }, { data: instances }] = await Promise.all([
+    supabase.from("habits").select("id, name").eq("profile_id", user.id),
+    supabase
+      .from("habit_instances")
+      .select("habit_id, completed, date")
+      .eq("profile_id", user.id)
+      .gte("date", startDate)
+      .lte("date", endDate),
+  ]);
+
+  return (habits || [])
+    .map((h: any) => {
+      const hi        = (instances || []).filter((i: any) => i.habit_id === h.id);
+      const completed = hi.filter((i: any) => i.completed).length;
+      const total     = hi.length;
+      return { id: h.id, name: h.name, completed, total, rate: total > 0 ? Math.round((completed / total) * 100) : 0 };
+    })
+    .filter((h) => h.total > 0);
 }

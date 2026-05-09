@@ -3,6 +3,28 @@
 import { createClient } from "@/lib/supabase/server";
 import { calcLevel } from "@/lib/xp";
 
+// Derive a category string for xp_transactions from the sourceType / reason
+function inferCategory(sourceType: string | undefined, reason: string): string {
+  if (sourceType) {
+    if (sourceType === "habit")    return "habit";
+    if (sourceType === "task")     return "task";
+    if (sourceType === "academic") return "academic";
+    if (sourceType === "bonus")    return "bonus";
+    if (sourceType === "career" || sourceType === "work") return "career";
+    if (sourceType === "health" || sourceType === "food" || sourceType === "sleep" || sourceType === "exercise") return "health";
+  }
+  // Fallback: infer from reason prefix
+  const r = reason.toLowerCase();
+  if (r.startsWith("habit"))    return "habit";
+  if (r.startsWith("task"))     return "task";
+  if (r.startsWith("quest"))    return "habit";
+  if (r.startsWith("exercise") || r.startsWith("food") || r.startsWith("sleep") || r.startsWith("health")) return "health";
+  if (r.startsWith("showed up") || r.startsWith("career") || r.startsWith("work")) return "career";
+  if (r.startsWith("assessment") || r.startsWith("academic")) return "academic";
+  if (r.includes("bonus") || r.includes("perfect") || r.includes("productive")) return "bonus";
+  return "misc";
+}
+
 export async function grantXP(amount: number, reason: string, sourceType?: string, sourceId?: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -25,7 +47,17 @@ export async function grantXP(amount: number, reason: string, sourceType?: strin
 
   if (updateError) throw updateError;
 
-  // Non-critical audit log — silently skip if table doesn't exist yet
+  const category = inferCategory(sourceType, reason);
+
+  // Write to xp_transactions (used by stats) — this is the canonical ledger
+  await supabase.from("xp_transactions").insert({
+    profile_id: user.id,
+    amount,
+    reason,
+    category,
+  }).then(() => {}, () => {});
+
+  // Also write to xp_events audit log — silently skip if table doesn't exist
   await supabase.from("xp_events").insert({
     profile_id: user.id,
     delta: amount,

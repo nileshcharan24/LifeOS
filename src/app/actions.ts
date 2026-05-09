@@ -47,6 +47,34 @@ export async function resetAccountAction(): Promise<{ error: string } | never> {
   redirect("/");
 }
 
+// PIN is stored as an env var so it never touches the DB.
+// Set LIFEOS_XP_RESET_PIN in .env.local (default: 123456 if unset — warn in dev).
+const XP_RESET_PIN = process.env.LIFEOS_XP_RESET_PIN ?? "123456";
+
+export async function resetXPOnlyAction(pin: string): Promise<{ error?: string }> {
+  if (pin !== XP_RESET_PIN) return { error: "Incorrect PIN." };
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated." };
+
+  // Wipe all XP transactions and level logs, reset profile XP + level to 0/1
+  await supabase.from("xp_transactions").delete().eq("profile_id", user.id);
+  await supabase.from("level_logs").delete().eq("profile_id", user.id);
+  // xp_events is a non-critical audit table — clear it too
+  await supabase.from("xp_events").delete().eq("profile_id", user.id).then(() => {}, () => {});
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ total_xp: 0, level: 1 })
+    .eq("id", user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  return {};
+}
+
 export async function grantXPServerAction(amount: number, reason: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

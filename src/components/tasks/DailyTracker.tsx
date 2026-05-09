@@ -21,6 +21,7 @@ import {
   type Habit, type HabitInstance, type DailyTask, type AssessmentEntry,
   type PlannerTask,
 } from "@/services/tasks/taskTrackerService";
+import { resetDailyHabitsAndTasks } from "@/services/tasks/dailyResetService";
 import { TASK_XP, PERFECT_DAY_BONUS, PRODUCTIVE_DAY_BONUS, ASSESSMENT_XP } from "@/services/tasks/taskTrackerConstants";
 import { ManageHabits } from "./ManageHabits";
 import { DailyStats } from "./DailyStats";
@@ -89,6 +90,13 @@ export function DailyTracker() {
 
   // ── fetch ──────────────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
+    // Reset habits and archive completed tasks on first load of the day
+    try {
+      await resetDailyHabitsAndTasks();
+    } catch (err) {
+      console.error("Reset failed:", err);
+    }
+
     // Compute UTC window for today in the user's local timezone so deadline
     // matching is correct regardless of UTC offset.
     const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
@@ -870,9 +878,9 @@ function TaskForm({
           onChange={e => onChange({ ...form, urgency: e.target.value as DailyTask["urgency"] })}
           className="h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
-          <option value="high">🔴 High Priority (+75 XP)</option>
-          <option value="medium">🟡 Medium Priority (+50 XP)</option>
-          <option value="low">⚫ Low Priority (+25 XP)</option>
+          <option value="high">🔴 High Priority (+40 XP)</option>
+          <option value="medium">🟡 Medium Priority (+30 XP)</option>
+          <option value="low">⚫ Low Priority (+20 XP)</option>
         </select>
         <select
           value={form.recurring}

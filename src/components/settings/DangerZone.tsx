@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { resetAccountAction } from "@/app/actions";
+import { resetAccountAction, resetXPOnlyAction } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { AlertTriangle, ChevronDown, ShieldAlert, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ShieldAlert, Trash2, X, Zap } from "lucide-react";
 
 const CONFIRM_PHRASE = "RESET MY ACCOUNT";
 const COUNTDOWN_SECONDS = 4;
@@ -91,6 +91,104 @@ function ConfirmDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCance
   );
 }
 
+// ─── XP Reset Section ───────────────────────────────────────────────────────────
+
+function XPResetSection() {
+  const [expanded, setExpanded] = useState(false);
+  const [pin, setPin]           = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+
+  const handleReset = async () => {
+    if (pin.length < 4) { setError("Enter your PIN."); return; }
+    setLoading(true);
+    setError(null);
+    const result = await resetXPOnlyAction(pin);
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+    } else {
+      toast.success("XP reset — you're back to Level 1.");
+      setPin("");
+      setExpanded(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 overflow-hidden">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-orange-500/10 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <Zap className="h-4 w-4 text-orange-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-orange-500">Reset XP &amp; Levels</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Zero out XP history — keep all habits, tasks, and data</p>
+          </div>
+        </div>
+        <ChevronDown
+          className={`h-4 w-4 text-orange-500/70 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {expanded && (
+        <div className="border-t border-orange-500/20 px-6 py-5 space-y-5">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-lg bg-background border border-border/40 px-3 py-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 mb-1.5">Kept</p>
+              <ul className="text-xs text-muted-foreground space-y-0.5">
+                <li>✓ All habits &amp; tasks</li>
+                <li>✓ Journal entries</li>
+                <li>✓ Health logs</li>
+                <li>✓ Career &amp; academic data</li>
+                <li>✓ Goals &amp; quests</li>
+              </ul>
+            </div>
+            <div className="rounded-lg bg-background border border-border/40 px-3 py-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-red-500 mb-1.5">Reset</p>
+              <ul className="text-xs text-muted-foreground space-y-0.5">
+                <li>✗ Total XP → 0</li>
+                <li>✗ Level → 1</li>
+                <li>✗ All XP transactions</li>
+                <li>✗ Level history</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium block">Enter your PIN to confirm</label>
+            <Input
+              type="password"
+              inputMode="numeric"
+              maxLength={12}
+              value={pin}
+              onChange={e => { setPin(e.target.value); setError(null); }}
+              placeholder="••••••"
+              className="font-mono text-sm w-40"
+              autoComplete="off"
+            />
+            {error && <p className="text-xs text-red-500">{error}</p>}
+            <p className="text-[11px] text-muted-foreground">
+              PIN is set via <code className="bg-muted px-1 rounded text-[10px]">LIFEOS_XP_RESET_PIN</code> in your environment.
+            </p>
+          </div>
+
+          <Button
+            variant="outline"
+            className="border-orange-500/40 text-orange-600 hover:bg-orange-500/10 hover:text-orange-500"
+            disabled={loading || !pin}
+            onClick={handleReset}
+          >
+            <Zap className="h-4 w-4 mr-2" />
+            {loading ? "Resetting…" : "Reset XP Only"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Danger Zone ────────────────────────────────────────────────────────────────
 
 export function DangerZone() {
@@ -120,6 +218,9 @@ export function DangerZone() {
           onCancel={() => setShowDialog(false)}
         />
       )}
+
+      <div className="space-y-4">
+      <XPResetSection />
 
       <div className="rounded-xl border border-red-500/30 bg-red-500/5 overflow-hidden">
         {/* Collapsed header */}
@@ -219,6 +320,7 @@ export function DangerZone() {
             </Button>
           </div>
         )}
+      </div>
       </div>
     </>
   );
