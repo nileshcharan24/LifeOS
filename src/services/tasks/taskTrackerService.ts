@@ -537,6 +537,17 @@ export async function addPlannerTaskToDailyTasks(task: PlannerTask) {
 
  const today = format(new Date(), "yyyy-MM-dd");
 
+ // Prevent duplicates
+ const { data: existing } = await supabase
+   .from("daily_tasks")
+   .select("id")
+   .eq("user_id", user.id)
+   .eq("name", task.title)
+   .eq("task_date", today)
+   .maybeSingle();
+
+ if (existing) throw new Error("ALREADY_EXISTS");
+
  const { error } = await supabase.from("daily_tasks").insert([
    {
      user_id: user.id,

@@ -144,13 +144,12 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
   };
 
   const handleRemoveDailyTask = (task: DailyTask) => {
-    const todayDeadline = task.deadline ? task.deadline.split("T")[0] === today : false;
-    if (todayDeadline) {
-      // Has today's deadline — prompt to reschedule
+    // Use local date comparison to handle timezone offsets correctly
+    const deadlineLocalDate = task.deadline ? format(new Date(task.deadline), "yyyy-MM-dd") : null;
+    if (deadlineLocalDate === today) {
       setReschedulingId(task.id);
       setRescheduleDate("");
     } else {
-      // Unscheduled task — remove directly
       doRemove(task.id);
     }
   };
@@ -158,8 +157,10 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
   const doRemove = async (taskId: string) => {
     setToggling(taskId);
     try {
-      const { removeFromTodayTasks } = await import("@/services/tasks/taskTrackerService");
-      await removeFromTodayTasks(taskId);
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { error } = await supabase.from("daily_tasks").delete().eq("id", taskId);
+      if (error) throw error;
       const newTasks = await getDailyTasksForDate(today);
       setTasks(newTasks);
       window.dispatchEvent(new CustomEvent("daily_data_updated"));
@@ -176,9 +177,21 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
     if (!rescheduleDate) return;
     setToggling(task.id);
     try {
-      const { removeFromTodayTasks, reschedulePlannerTask } = await import("@/services/tasks/taskTrackerService");
-      await reschedulePlannerTask(task.name, rescheduleDate);
-      await removeFromTodayTasks(task.id);
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      await supabase
+        .from("tasks")
+        .update({ deadline: rescheduleDate })
+        .eq("profile_id", user.id)
+        .eq("title", task.name)
+        .eq("is_completed", false);
+
+      const { error } = await supabase.from("daily_tasks").delete().eq("id", task.id);
+      if (error) throw error;
+
       const newTasks = await getDailyTasksForDate(today);
       setTasks(newTasks);
       setReschedulingId(null);
@@ -1174,9 +1187,13 @@ export function DashboardHub({ onNav }: DashboardHubProps) {
       toast.success(`Added "${task.title}" to today's tasks.`);
       window.dispatchEvent(new CustomEvent("daily_data_updated"));
       window.dispatchEvent(new CustomEvent("planner_tasks_updated"));
-    } catch (error) {
-      console.error("Failed to move task:", error);
-      toast.error("Failed to move task.");
+    } catch (error: any) {
+      if (error?.message === "ALREADY_EXISTS") {
+        toast.info(`"${task.title}" is already in today's tasks.`);
+      } else {
+        console.error("Failed to move task:", error);
+        toast.error("Failed to move task.");
+      }
     } finally {
       setMoving(null);
     }
