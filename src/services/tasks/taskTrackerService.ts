@@ -571,6 +571,36 @@ export async function removePlannerTaskFromDailyTasks(taskTitle: string) {
 
   revalidatePath("/dashboard");
 }
+
+export async function removeFromTodayTasks(id: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { error } = await supabase
+    .from("daily_tasks")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) throw error;
+  revalidatePath("/dashboard");
+}
+
+export async function reschedulePlannerTask(taskTitle: string, newDeadline: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  await supabase
+    .from("tasks")
+    .update({ deadline: newDeadline })
+    .eq("profile_id", user.id)
+    .eq("title", taskTitle)
+    .eq("is_completed", false);
+
+  revalidatePath("/dashboard");
+}
 // ─── Academic Integration ─────────────────────────────────────────────────────
 
 export async function getAssessmentsForTracker(

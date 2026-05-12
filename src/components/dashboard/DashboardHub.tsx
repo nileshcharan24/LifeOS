@@ -65,6 +65,8 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
   const [tasks, setTasks]       = useState<DailyTask[]>([]);
   const [loading, setLoading]   = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
 
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -141,18 +143,52 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
     }
   };
 
-  const handleRemoveDailyTask = async (taskId: string) => {
+  const handleRemoveDailyTask = (task: DailyTask) => {
+    const todayDeadline = task.deadline ? task.deadline.split("T")[0] === today : false;
+    if (todayDeadline) {
+      // Has today's deadline — prompt to reschedule
+      setReschedulingId(task.id);
+      setRescheduleDate("");
+    } else {
+      // Unscheduled task — remove directly
+      doRemove(task.id);
+    }
+  };
+
+  const doRemove = async (taskId: string) => {
     setToggling(taskId);
     try {
-      const { deleteDailyTask } = await import("@/services/tasks/taskTrackerService");
-      await deleteDailyTask(taskId, false);
+      const { removeFromTodayTasks } = await import("@/services/tasks/taskTrackerService");
+      await removeFromTodayTasks(taskId);
       const newTasks = await getDailyTasksForDate(today);
       setTasks(newTasks);
       window.dispatchEvent(new CustomEvent("daily_data_updated"));
       window.dispatchEvent(new CustomEvent("planner_tasks_updated"));
-    } catch (error) {
-      console.error("Failed to remove task:", error);
+    } catch (err) {
+      console.error("Failed to remove task:", err);
       toast.error("Failed to remove task.");
+    } finally {
+      setToggling(null);
+    }
+  };
+
+  const handleReschedule = async (task: DailyTask) => {
+    if (!rescheduleDate) return;
+    setToggling(task.id);
+    try {
+      const { removeFromTodayTasks, reschedulePlannerTask } = await import("@/services/tasks/taskTrackerService");
+      await reschedulePlannerTask(task.name, rescheduleDate);
+      await removeFromTodayTasks(task.id);
+      const newTasks = await getDailyTasksForDate(today);
+      setTasks(newTasks);
+      setReschedulingId(null);
+      setRescheduleDate("");
+      toast.success(`"${task.name}" rescheduled.`);
+      window.dispatchEvent(new CustomEvent("daily_data_updated"));
+      window.dispatchEvent(new CustomEvent("planner_tasks_updated"));
+    } catch (err) {
+      console.error("Failed to reschedule task:", err);
+      toast.error("Failed to reschedule task.");
     } finally {
       setToggling(null);
     }
@@ -237,6 +273,41 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
             {sortedTasks.map(task => {
               const done = task.is_completed;
               const isTogglingThis = toggling === task.id;
+              const isRescheduling = reschedulingId === task.id;
+
+              if (isRescheduling) {
+                return (
+                  <div key={task.id} className="rounded-lg border border-border/60 bg-muted/30 p-2.5 space-y-2 text-sm">
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{task.name}</span> has a deadline today.
+                      Pick a new date to reschedule it.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={rescheduleDate}
+                        min={format(new Date(new Date().setDate(new Date().getDate() + 1)), "yyyy-MM-dd")}
+                        onChange={e => setRescheduleDate(e.target.value)}
+                        className="flex-1 h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                      />
+                      <button
+                        onClick={() => handleReschedule(task)}
+                        disabled={!rescheduleDate || isTogglingThis}
+                        className="h-8 px-3 rounded-md bg-foreground text-background text-xs font-medium disabled:opacity-50 hover:opacity-80 transition-opacity"
+                      >
+                        {isTogglingThis ? "…" : "Reschedule"}
+                      </button>
+                      <button
+                        onClick={() => { setReschedulingId(null); setRescheduleDate(""); }}
+                        className="h-8 px-2 text-muted-foreground hover:text-foreground text-xs"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div
                   key={task.id}
@@ -265,7 +336,7 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
                     {task.urgency}
                   </Badge>
                   <button
-                    onClick={() => handleRemoveDailyTask(task.id)}
+                    onClick={() => handleRemoveDailyTask(task)}
                     disabled={isTogglingThis}
                     className="flex-shrink-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
                     title="Remove from today"
