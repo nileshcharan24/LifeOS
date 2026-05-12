@@ -284,7 +284,7 @@ export async function buildContextPackage(): Promise<ContextPackage> {
     amount: x.amount,
     reason: x.reason,
     category: x.category ?? null,
-    createdAt: x.created_at,
+    createdAt: x.created_at ?? "",
   }));
 
   // ─ Academics
