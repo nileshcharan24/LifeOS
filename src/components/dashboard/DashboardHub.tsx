@@ -20,7 +20,7 @@ import { useMode } from "@/context/ModeContext";
 import {
   CheckCircle2, Circle, Calendar, BookMarked, Heart,
   Zap, ShoppingBag, Pencil, ArrowRight, Clock, TrendingUp,
-  AlertCircle, Flame, Sparkles, Lock, MessageSquare, BookOpen, Briefcase, PlusCircle,
+  AlertCircle, Flame, Sparkles, Lock, MessageSquare, BookOpen, Briefcase, PlusCircle, MinusCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -420,8 +420,9 @@ function UpcomingDeadlinesSection({ onNav, handleMoveTask, moving }: { onNav: (t
 
 // ─── Section 3.5: Unscheduled Tasks ───────────────────────────────────────────
 
-function UnscheduledTasksSection({ onNav, handleMoveTask, moving }: { onNav: (tab: string) => void; handleMoveTask: (task: any) => Promise<void>; moving: string | null; }) {
+function UnscheduledTasksSection({ onNav, handleMoveTask, handleRemoveTask, moving }: { onNav: (tab: string) => void; handleMoveTask: (task: any) => Promise<void>; handleRemoveTask: (task: any) => Promise<void>; moving: string | null; }) {
   const [tasks, setTasks] = useState<any[]>([]);
+  const [todayTitles, setTodayTitles] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -430,22 +431,37 @@ function UnscheduledTasksSection({ onNav, handleMoveTask, moving }: { onNav: (ta
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      
-      const { data } = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("profile_id", user.id)
-        .is("deadline", null)
-        .eq("is_completed", false)
-        .order("created_at", { ascending: false });
-        
-      if (data) setTasks(data);
+
+      const today = format(new Date(), "yyyy-MM-dd");
+
+      const [tasksResult, dailyResult] = await Promise.all([
+        supabase
+          .from("tasks")
+          .select("*")
+          .eq("profile_id", user.id)
+          .is("deadline", null)
+          .eq("is_completed", false)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("daily_tasks")
+          .select("name")
+          .eq("user_id", user.id)
+          .eq("task_date", today)
+          .eq("is_completed", false),
+      ]);
+
+      if (tasksResult.data) setTasks(tasksResult.data);
+      setTodayTitles(new Set((dailyResult.data ?? []).map((t: any) => t.name)));
       setLoading(false);
     };
 
     fetchUnscheduled();
     window.addEventListener("planner_tasks_updated", fetchUnscheduled);
-    return () => window.removeEventListener("planner_tasks_updated", fetchUnscheduled);
+    window.addEventListener("daily_data_updated", fetchUnscheduled);
+    return () => {
+      window.removeEventListener("planner_tasks_updated", fetchUnscheduled);
+      window.removeEventListener("daily_data_updated", fetchUnscheduled);
+    };
   }, []);
 
   return (
@@ -455,25 +471,32 @@ function UnscheduledTasksSection({ onNav, handleMoveTask, moving }: { onNav: (ta
       ) : tasks.length === 0 ? (
         <p className="text-sm text-muted-foreground">No unscheduled tasks.</p>
       ) : (
-        <div className="space-y-2">
-          {tasks.slice(0, 5).map(task => (
-            <div key={task.id} className="flex items-center gap-2 text-sm">
-               <button onClick={() => handleMoveTask(task)} disabled={moving === task.id} className="text-muted-foreground hover:text-primary disabled:opacity-50">
-                   {moving === task.id ? (
-                       <div className="h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                   ) : (
-                       <PlusCircle className="h-3.5 w-3.5" />
-                   )}
-               </button>
-              <span className="truncate flex-1">{task.title}</span>
-              <Badge variant="outline" className={cn("text-[10px] px-1 py-0 flex-shrink-0", urgencyColor(task.priority ?? "medium"))}>
-                {task.priority ?? "medium"}
-              </Badge>
-            </div>
-          ))}
-          {tasks.length > 5 && (
-            <p className="text-xs text-muted-foreground text-center pt-1">+{tasks.length - 5} more</p>
-          )}
+        <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+          {tasks.map(task => {
+            const inToday = todayTitles.has(task.title);
+            return (
+              <div key={task.id} className="flex items-center gap-2 text-sm">
+                <button
+                  onClick={() => inToday ? handleRemoveTask(task) : handleMoveTask(task)}
+                  disabled={moving === task.id}
+                  className={cn("flex-shrink-0 disabled:opacity-50 transition-colors", inToday ? "text-primary hover:text-destructive" : "text-muted-foreground hover:text-primary")}
+                  title={inToday ? "Remove from today" : "Add to today"}
+                >
+                  {moving === task.id ? (
+                    <div className="h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                  ) : inToday ? (
+                    <MinusCircle className="h-3.5 w-3.5" />
+                  ) : (
+                    <PlusCircle className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                <span className="truncate flex-1">{task.title}</span>
+                <Badge variant="outline" className={cn("text-[10px] px-1 py-0 flex-shrink-0", urgencyColor(task.priority ?? "medium"))}>
+                  {task.priority ?? "medium"}
+                </Badge>
+              </div>
+            );
+          })}
         </div>
       )}
       <div className="mt-4 pt-3 border-t border-border/40">
@@ -1045,12 +1068,28 @@ export function DashboardHub({ onNav }: DashboardHubProps) {
     try {
       const { addPlannerTaskToDailyTasks } = await import("@/services/tasks/taskTrackerService");
       await addPlannerTaskToDailyTasks(task);
-      toast.success(`Moved "${task.title}" to today's tasks.`);
+      toast.success(`Added "${task.title}" to today's tasks.`);
       window.dispatchEvent(new CustomEvent("daily_data_updated"));
       window.dispatchEvent(new CustomEvent("planner_tasks_updated"));
     } catch (error) {
       console.error("Failed to move task:", error);
       toast.error("Failed to move task.");
+    } finally {
+      setMoving(null);
+    }
+  };
+
+  const handleRemoveTask = async (task: any) => {
+    setMoving(task.id);
+    try {
+      const { removePlannerTaskFromDailyTasks } = await import("@/services/tasks/taskTrackerService");
+      await removePlannerTaskFromDailyTasks(task.title);
+      toast.success(`Removed "${task.title}" from today's tasks.`);
+      window.dispatchEvent(new CustomEvent("daily_data_updated"));
+      window.dispatchEvent(new CustomEvent("planner_tasks_updated"));
+    } catch (error) {
+      console.error("Failed to remove task:", error);
+      toast.error("Failed to remove task.");
     } finally {
       setMoving(null);
     }
@@ -1067,7 +1106,7 @@ export function DashboardHub({ onNav }: DashboardHubProps) {
       {isDeepMode && <NegativeHabitsSection onNav={onNav} />}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <UpcomingDeadlinesSection onNav={onNav} handleMoveTask={handleMoveTask} moving={moving} />
-        <UnscheduledTasksSection onNav={onNav} handleMoveTask={handleMoveTask} moving={moving} />
+        <UnscheduledTasksSection onNav={onNav} handleMoveTask={handleMoveTask} handleRemoveTask={handleRemoveTask} moving={moving} />
       </div>
       <JournalTodaySection onNav={onNav} />
       <HealthSnapshotSection onNav={onNav} />

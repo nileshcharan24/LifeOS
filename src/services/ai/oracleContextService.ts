@@ -60,7 +60,40 @@ export type ContextPackage = {
     earnedFromExercise: number;
     totalXPEvents: number;
   };
+  xpTransactionsRecent: {
+    amount: number;
+    reason: string;
+    category: string | null;
+    createdAt: string;
+  }[];
   aboutMe: string | null;
+  dailyTasksToday: {
+    name: string;
+    urgency: string;
+    isCompleted: boolean;
+  }[];
+  academics: {
+    courses: { name: string; code: string | null; credits: number }[];
+    upcomingAssessments: {
+      courseName: string;
+      name: string;
+      type: string;
+      dueDate: string;
+      status: string;
+    }[];
+  };
+  growthVault: {
+    categories: string[];
+    contentSources: string[];
+    activeSideQuests: { title: string; description: string | null; estimatedTime: string | null }[];
+    completedSideQuestsCount: number;
+  };
+  career: {
+    activeRoles: { title: string; company: string | null; type: string }[];
+    sessionsThisWeek: number;
+    totalMinutesThisWeek: number;
+    recentLogs: { date: string; content: string; tags: string[] }[];
+  };
 };
 
 function truncateContent(content: string, maxLen = 200): string {
@@ -79,6 +112,10 @@ export async function buildContextPackage(): Promise<ContextPackage> {
   weekStart.setDate(today.getDate() - 6);
   const weekStartStr = weekStart.toISOString().split("T")[0];
 
+  const twoWeeksLater = new Date(today);
+  twoWeeksLater.setDate(today.getDate() + 14);
+  const twoWeeksLaterStr = twoWeeksLater.toISOString().split("T")[0];
+
   // Run all queries in parallel
   const [
     profileRes,
@@ -93,6 +130,15 @@ export async function buildContextPackage(): Promise<ContextPackage> {
     negHabitsRes,
     goalsRes,
     pastSessionsRes,
+    xpTransactionsRes,
+    dailyTasksTodayRes,
+    coursesRes,
+    assessmentsRes,
+    userPrefsRes,
+    sideQuestsRes,
+    workRolesRes,
+    workSessionsRes,
+    workLogsRes,
   ] = await Promise.all([
     supabase.from("profiles").select("username, full_name, level, total_xp, daily_streak").eq("id", user.id).single(),
     supabase.from("habit_instances").select("habit_id, date, completed, xp_earned").eq("profile_id", user.id).gte("date", weekStartStr),
@@ -106,6 +152,15 @@ export async function buildContextPackage(): Promise<ContextPackage> {
     supabase.from("negative_habits").select("id, name").eq("profile_id", user.id).eq("is_active", true),
     supabase.from("future_goals").select("title, target_date, priority").eq("profile_id", user.id).eq("is_completed", false).limit(10),
     supabase.from("oracle_chat_sessions").select("session_date, summary, topics, primary_mood").eq("profile_id", user.id).gte("session_date", weekStartStr).order("session_date", { ascending: false }).limit(7),
+    supabase.from("xp_transactions").select("amount, reason, category, created_at").eq("profile_id", user.id).gte("created_at", `${weekStartStr}T00:00:00`).order("created_at", { ascending: false }).limit(50),
+    supabase.from("daily_tasks").select("name, urgency, is_completed").eq("user_id", user.id).eq("task_date", todayStr),
+    supabase.from("courses").select("name, code, credits").eq("profile_id", user.id),
+    supabase.from("assessments").select("name, type, due_date, status, courses(name)").eq("profile_id", user.id).neq("status", "completed").lte("due_date", twoWeeksLaterStr).gte("due_date", todayStr).order("due_date"),
+    supabase.from("user_preferences").select("categories, content_sources").eq("profile_id", user.id).maybeSingle(),
+    supabase.from("growth_side_quests").select("title, description, estimated_time, status").eq("profile_id", user.id).order("created_at", { ascending: false }),
+    supabase.from("work_roles").select("title, company, type").eq("profile_id", user.id).eq("is_active", true),
+    supabase.from("work_sessions").select("date, duration_minutes").eq("profile_id", user.id).gte("date", weekStartStr),
+    supabase.from("work_logs").select("date, content, tags").eq("profile_id", user.id).gte("date", weekStartStr).order("date", { ascending: false }).limit(5),
   ]);
 
   const profile = profileRes.data;
@@ -132,6 +187,15 @@ export async function buildContextPackage(): Promise<ContextPackage> {
   const negHabits = negHabitsRes.data ?? [];
   const goals = goalsRes.data ?? [];
   const pastSessions = pastSessionsRes.data ?? [];
+  const xpTransactions = xpTransactionsRes.data ?? [];
+  const dailyTasksToday = dailyTasksTodayRes.data ?? [];
+  const courses = coursesRes.data ?? [];
+  const assessments = (assessmentsRes.data ?? []) as any[];
+  const userPrefs = userPrefsRes.data as any;
+  const sideQuests = (sideQuestsRes.data ?? []) as any[];
+  const workRoles = workRolesRes.data ?? [];
+  const workSessions = workSessionsRes.data ?? [];
+  const workLogs = (workLogsRes.data ?? []) as any[];
 
   // ─ Habits summary
   const habitsThisWeek = habits.map((habit) => {
@@ -215,6 +279,51 @@ export async function buildContextPackage(): Promise<ContextPackage> {
       primaryMood: s.primary_mood,
     }));
 
+  // ─ XP transactions recent
+  const xpTransactionsRecent = xpTransactions.map((x) => ({
+    amount: x.amount,
+    reason: x.reason,
+    category: x.category ?? null,
+    createdAt: x.created_at,
+  }));
+
+  // ─ Academics
+  const academicCourses = courses.map((c: any) => ({
+    name: c.name,
+    code: c.code ?? null,
+    credits: c.credits ?? 3,
+  }));
+  const upcomingAssessments = assessments.map((a) => ({
+    courseName: (a.courses as any)?.name ?? "Unknown",
+    name: a.name,
+    type: a.type,
+    dueDate: a.due_date,
+    status: a.status,
+  }));
+
+  // ─ Growth & Vault
+  const growthCategories: string[] = userPrefs?.categories ?? [];
+  const rawSources: any[] = userPrefs?.content_sources ?? [];
+  const growthSources = rawSources.map((s: any) => s.label).filter(Boolean);
+  const activeSideQuests = sideQuests
+    .filter((q) => q.status === "active")
+    .map((q) => ({ title: q.title, description: q.description ?? null, estimatedTime: q.estimated_time ?? null }));
+  const completedSideQuestsCount = sideQuests.filter((q) => q.status === "completed").length;
+
+  // ─ Career
+  const activeRoles = workRoles.map((r: any) => ({
+    title: r.title,
+    company: r.company ?? null,
+    type: r.type,
+  }));
+  const sessionsThisWeek = workSessions.length;
+  const totalMinutesThisWeek = workSessions.reduce((sum: number, s: any) => sum + (s.duration_minutes ?? 0), 0);
+  const recentLogs = workLogs.map((l) => ({
+    date: l.date,
+    content: truncateContent(l.content ?? "", 150),
+    tags: l.tags ?? [],
+  }));
+
   return {
     user: {
       name: profile?.full_name ?? profile?.username ?? null,
@@ -247,6 +356,28 @@ export async function buildContextPackage(): Promise<ContextPackage> {
       earnedFromHabits: habitInstances.reduce((sum, i) => sum + (i.xp_earned ?? 0), 0),
       earnedFromExercise: exerciseLogs.reduce((sum, e) => sum + (e.xp_earned ?? 0), 0),
       totalXPEvents: habitInstances.filter((i) => i.completed).length + exerciseLogs.length,
+    },
+    xpTransactionsRecent,
+    dailyTasksToday: dailyTasksToday.map((t: any) => ({
+      name: t.name,
+      urgency: t.urgency ?? "medium",
+      isCompleted: t.is_completed ?? false,
+    })),
+    academics: {
+      courses: academicCourses,
+      upcomingAssessments,
+    },
+    growthVault: {
+      categories: growthCategories,
+      contentSources: growthSources,
+      activeSideQuests,
+      completedSideQuestsCount,
+    },
+    career: {
+      activeRoles,
+      sessionsThisWeek,
+      totalMinutesThisWeek,
+      recentLogs,
     },
   };
 }

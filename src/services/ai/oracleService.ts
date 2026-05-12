@@ -225,6 +225,38 @@ function buildSystemPrompt(config: OracleConfig, ctx: ContextPackage, comfortMod
     ? `\nABOUT THE USER (written by them — treat as ground truth):\n${ctx.aboutMe.trim()}\n`
     : "";
 
+  const dailyTasksText = ctx.dailyTasksToday.length > 0
+    ? ctx.dailyTasksToday.map((t) => `  - [${t.isCompleted ? "✓" : " "}] ${t.name} (${t.urgency})`).join("\n")
+    : "  None added for today.";
+
+  const xpRecentText = ctx.xpTransactionsRecent.slice(0, 15)
+    .map((x) => `  - ${x.amount > 0 ? "+" : ""}${x.amount} XP: ${x.reason} (${x.category ?? "misc"})`)
+    .join("\n");
+
+  const academicsText = ctx.academics.courses.length > 0
+    ? `Courses: ${ctx.academics.courses.map((c) => `${c.name}${c.code ? ` (${c.code})` : ""}`).join(", ")}\n` +
+      (ctx.academics.upcomingAssessments.length > 0
+        ? "Upcoming assessments:\n" + ctx.academics.upcomingAssessments.map((a) => `  - [${a.courseName}] ${a.name} (${a.type}) — due ${a.dueDate}`).join("\n")
+        : "  No upcoming assessments in the next 2 weeks.")
+    : "  No courses found.";
+
+  const growthText = ctx.growthVault.categories.length > 0
+    ? `Interests: ${ctx.growthVault.categories.join(", ")}\n` +
+      (ctx.growthVault.contentSources.length > 0 ? `Sources: ${ctx.growthVault.contentSources.join(", ")}\n` : "") +
+      (ctx.growthVault.activeSideQuests.length > 0
+        ? `Active side quests (${ctx.growthVault.activeSideQuests.length}):\n` + ctx.growthVault.activeSideQuests.slice(0, 5).map((q) => `  - ${q.title}${q.estimatedTime ? ` [${q.estimatedTime}]` : ""}`).join("\n")
+        : "  No active side quests.") +
+      `\nCompleted quests: ${ctx.growthVault.completedSideQuestsCount}`
+    : "  Not set up yet.";
+
+  const careerText = ctx.career.activeRoles.length > 0
+    ? `Active roles: ${ctx.career.activeRoles.map((r) => `${r.title}${r.company ? ` @ ${r.company}` : ""} (${r.type})`).join(", ")}\n` +
+      `Sessions this week: ${ctx.career.sessionsThisWeek} | Total time: ${ctx.career.totalMinutesThisWeek} min\n` +
+      (ctx.career.recentLogs.length > 0
+        ? "Recent work logs:\n" + ctx.career.recentLogs.map((l) => `  - ${l.date}: ${l.content}${l.tags.length > 0 ? ` [${l.tags.join(", ")}]` : ""}`).join("\n")
+        : "")
+    : "  No active roles.";
+
   return `You are ${config.oracle_name}, a personal AI life coach embedded in LifeOS.
 ${aboutMeSection}
 USER PROFILE:
@@ -241,9 +273,12 @@ PERSONALITY:
 HABIT DATA (this week):
 ${habitsText || "  No habits tracked yet."}
 
-TASKS:
+PLANNER TASKS:
 - Pending: ${ctx.tasksThisWeek.pending} | Overdue: ${ctx.tasksThisWeek.overdue}
 - Upcoming: ${ctx.tasksThisWeek.upcomingTitles.join(", ") || "None"}
+
+TODAY'S DAILY TASKS:
+${dailyTasksText}
 
 HEALTH (7-day averages):
 - Sleep: ${ctx.healthThisWeek.avgSleepHours ?? "not logged"} hrs avg
@@ -264,6 +299,18 @@ ${negHabitsText || "  None logged."}
 
 LONG-TERM GOALS:
 ${goalsText || "  No goals set yet."}
+
+ACADEMICS:
+${academicsText}
+
+GROWTH & VAULT:
+${growthText}
+
+CAREER:
+${careerText}
+
+XP TRANSACTIONS (recent, this week):
+${xpRecentText || "  No XP events this week."}
 
 PAST CONVERSATIONS (recent):
 ${pastConvoText || "  No past conversations."}

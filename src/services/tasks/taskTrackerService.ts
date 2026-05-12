@@ -553,6 +553,24 @@ export async function addPlannerTaskToDailyTasks(task: PlannerTask) {
  if (error) throw error;
  revalidatePath("/dashboard");
 }
+
+export async function removePlannerTaskFromDailyTasks(taskTitle: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const today = format(new Date(), "yyyy-MM-dd");
+
+  await supabase
+    .from("daily_tasks")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("name", taskTitle)
+    .eq("task_date", today)
+    .eq("is_completed", false);
+
+  revalidatePath("/dashboard");
+}
 // ─── Academic Integration ─────────────────────────────────────────────────────
 
 export async function getAssessmentsForTracker(

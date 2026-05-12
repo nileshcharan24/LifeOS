@@ -1,8 +1,6 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { grantXP } from "@/services/economy/xpService";
-import { getXPConfig } from "@/services/economy/xpConfigService";
 
 export type ExerciseIntensity = "light" | "moderate" | "intense";
 export type ExerciseType = "gym" | "cardio";
@@ -112,7 +110,6 @@ export async function logExercise(params: {
 
   if (error) throw new Error(error.message);
 
-  await grantXP(xp, `Exercise: ${params.activity_type}`);
   return { xp };
 }
 
@@ -197,12 +194,6 @@ export async function logFood(params: {
   });
 
   if (error) throw new Error(error.message);
-
-  // Only grant XP for non-junk meals
-  if (!params.is_junk) {
-    const config = await getXPConfig();
-    await grantXP(config.xp_food_meal, `Food: ${params.description} (${params.meal_type})`, "food");
-  }
 }
 
 export async function deleteFoodLog(id: string) {
@@ -280,9 +271,6 @@ export async function upsertSleepLog(params: {
   }, { onConflict: "profile_id,date" });
 
   if (error) throw new Error(error.message);
-
-  const config = await getXPConfig();
-  await grantXP(config.xp_sleep_log, `Sleep log: ${params.date}`, "sleep");
 }
 
 export async function deleteSleepLog(id: string) {

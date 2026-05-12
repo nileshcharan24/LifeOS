@@ -81,6 +81,9 @@ export function GrowthVault() {
       {(loadState === "onboarding" || editingPrefs) && (
         <GrowthOnboarding
           onComplete={(cats, srcs) => handleOnboardingComplete(cats, srcs)}
+          onCancel={editingPrefs ? () => setEditingPrefs(false) : undefined}
+          initialCategories={editingPrefs ? categories : undefined}
+          initialSources={editingPrefs ? sources : undefined}
         />
       )}
 

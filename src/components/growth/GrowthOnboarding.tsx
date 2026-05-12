@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { savePreferences, type ContentSource } from "@/services/growth/preferencesService";
+import { X } from "lucide-react";
 
 const PRESET_CATEGORIES = [
   "Tech & Programming",
@@ -25,13 +26,18 @@ const PRESET_CATEGORIES = [
 
 type Props = {
   onComplete: (categories: string[], sources: ContentSource[]) => void;
+  onCancel?: () => void;
+  initialCategories?: string[];
+  initialSources?: ContentSource[];
 };
 
-export function GrowthOnboarding({ onComplete }: Props) {
+export function GrowthOnboarding({ onComplete, onCancel, initialCategories, initialSources }: Props) {
   const [screen, setScreen] = useState<1 | 2>(1);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set(initialCategories ?? []));
   const [customInput, setCustomInput] = useState("");
-  const [sources, setSources] = useState<ContentSource[]>([{ label: "", url: "" }]);
+  const [sources, setSources] = useState<ContentSource[]>(
+    initialSources && initialSources.length > 0 ? initialSources : [{ label: "", url: "" }]
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,13 +90,22 @@ export function GrowthOnboarding({ onComplete }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-2xl mx-4 rounded-2xl border border-border/60 bg-background shadow-2xl">
+      <div className="w-full max-w-2xl mx-4 rounded-2xl border border-border/60 bg-background shadow-2xl flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="px-8 pt-8 pb-4">
-          <div className="flex items-center gap-3 mb-1">
+        <div className="px-8 pt-8 pb-4 flex-shrink-0">
+          <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
               Growth & Vault Setup — Step {screen} of 2
             </span>
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Cancel"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
           </div>
           <div className="w-full h-1 rounded-full bg-muted mt-2">
             <div
@@ -102,7 +117,7 @@ export function GrowthOnboarding({ onComplete }: Props) {
 
         {/* ── Screen 1: Categories ── */}
         {screen === 1 && (
-          <div className="px-8 pb-8">
+          <div className="px-8 pb-8 overflow-y-auto flex-1">
             <h2 className="text-2xl font-semibold mt-4">What topics excite you?</h2>
             <p className="text-sm text-muted-foreground mt-1 mb-6">
               Pick the categories you want to learn and stay updated on. You can add custom ones too.
@@ -172,50 +187,52 @@ export function GrowthOnboarding({ onComplete }: Props) {
 
         {/* ── Screen 2: Content Sources ── */}
         {screen === 2 && (
-          <div className="px-8 pb-8">
-            <h2 className="text-2xl font-semibold mt-4">Who do you like to watch or read?</h2>
-            <p className="text-sm text-muted-foreground mt-1 mb-6">
+          <div className="px-8 pb-8 flex flex-col flex-1 min-h-0">
+            <h2 className="text-2xl font-semibold mt-4 flex-shrink-0">Who do you like to watch or read?</h2>
+            <p className="text-sm text-muted-foreground mt-1 mb-6 flex-shrink-0">
               Add your favourite YouTube channels, newsletters, or blogs. The AI uses these to recommend content you'll actually want.
             </p>
 
-            <div className="space-y-3 mb-4">
-              {sources.map((source, index) => (
-                <div key={index} className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    value={source.label}
-                    onChange={(e) => updateSource(index, "label", e.target.value)}
-                    placeholder="Name (e.g. Think School)"
-                    className="w-40 h-10 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                  <input
-                    type="text"
-                    value={source.url}
-                    onChange={(e) => updateSource(index, "url", e.target.value)}
-                    placeholder="Link or handle (optional)"
-                    className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                  {sources.length > 1 && (
-                    <button
-                      onClick={() => removeSource(index)}
-                      className="text-muted-foreground hover:text-foreground text-lg leading-none px-1"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
+            <div className="flex-1 overflow-y-auto min-h-0 pr-1">
+              <div className="space-y-3 mb-4">
+                {sources.map((source, index) => (
+                  <div key={index} className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={source.label}
+                      onChange={(e) => updateSource(index, "label", e.target.value)}
+                      placeholder="Name (e.g. Think School)"
+                      className="w-40 h-10 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <input
+                      type="text"
+                      value={source.url}
+                      onChange={(e) => updateSource(index, "url", e.target.value)}
+                      placeholder="Link or handle (optional)"
+                      className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    {sources.length > 1 && (
+                      <button
+                        onClick={() => removeSource(index)}
+                        className="text-muted-foreground hover:text-foreground text-lg leading-none px-1"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <Button variant="outline" size="sm" onClick={addSource}>
+                + Add another source
+              </Button>
             </div>
 
-            <Button variant="outline" size="sm" onClick={addSource} className="mb-6">
-              + Add another source
-            </Button>
-
             {error && (
-              <p className="text-sm text-destructive mb-4">{error}</p>
+              <p className="text-sm text-destructive mt-3 flex-shrink-0">{error}</p>
             )}
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mt-6 flex-shrink-0">
               <button
                 onClick={() => setScreen(1)}
                 className="text-sm text-muted-foreground hover:text-foreground"
