@@ -20,7 +20,7 @@ import { useMode } from "@/context/ModeContext";
 import {
   CheckCircle2, Circle, Calendar, BookMarked, Heart,
   Zap, ShoppingBag, Pencil, ArrowRight, Clock, TrendingUp,
-  AlertCircle, Flame, Sparkles, Lock, MessageSquare, BookOpen, Briefcase, PlusCircle, MinusCircle,
+  AlertCircle, Flame, Sparkles, Lock, MessageSquare, BookOpen, Briefcase, PlusCircle, MinusCircle, X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -141,6 +141,23 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
     }
   };
 
+  const handleRemoveDailyTask = async (taskId: string) => {
+    setToggling(taskId);
+    try {
+      const { deleteDailyTask } = await import("@/services/tasks/taskTrackerService");
+      await deleteDailyTask(taskId, false);
+      const newTasks = await getDailyTasksForDate(today);
+      setTasks(newTasks);
+      window.dispatchEvent(new CustomEvent("daily_data_updated"));
+      window.dispatchEvent(new CustomEvent("planner_tasks_updated"));
+    } catch (error) {
+      console.error("Failed to remove task:", error);
+      toast.error("Failed to remove task.");
+    } finally {
+      setToggling(null);
+    }
+  };
+
   const sortedTasks = [...tasks].sort((a, b) => {
     if (a.is_completed !== b.is_completed) {
       return a.is_completed ? 1 : -1;
@@ -221,26 +238,41 @@ function DailyHabitsTasksSection({ onNav }: { onNav: (tab: string) => void }) {
               const done = task.is_completed;
               const isTogglingThis = toggling === task.id;
               return (
-                <button
+                <div
                   key={task.id}
-                  onClick={() => handleToggleTask(task.id)}
-                  disabled={isTogglingThis}
-                  className="flex items-center gap-2 text-sm w-full hover:bg-muted/50 p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                  className="flex items-center gap-2 text-sm w-full hover:bg-muted/50 px-1 py-1 rounded transition-colors group"
                 >
-                  {isTogglingThis ? (
-                    <div className="h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin flex-shrink-0" />
-                  ) : done ? (
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
-                  ) : (
-                    <Circle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                  )}
-                  <span className={cn("truncate", done && "line-through text-muted-foreground")}>
+                  <button
+                    onClick={() => handleToggleTask(task.id)}
+                    disabled={isTogglingThis}
+                    className="flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isTogglingThis ? (
+                      <div className="h-3.5 w-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                    ) : done ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                    ) : (
+                      <Circle className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                  </button>
+                  <span
+                    className={cn("truncate flex-1 text-left cursor-pointer", done && "line-through text-muted-foreground")}
+                    onClick={() => !isTogglingThis && handleToggleTask(task.id)}
+                  >
                     {task.name}
                   </span>
-                  <Badge variant="outline" className={cn("text-[10px] px-1 py-0 ml-auto flex-shrink-0", urgencyColor(task.urgency))}>
+                  <Badge variant="outline" className={cn("text-[10px] px-1 py-0 flex-shrink-0", urgencyColor(task.urgency))}>
                     {task.urgency}
                   </Badge>
-                </button>
+                  <button
+                    onClick={() => handleRemoveDailyTask(task.id)}
+                    disabled={isTogglingThis}
+                    className="flex-shrink-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                    title="Remove from today"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
               );
             })}
             {tasks.length === 0 && (
