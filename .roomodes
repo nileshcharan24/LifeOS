@@ -1,0 +1,11 @@
+customModes:
+  - slug: lifeos-roo-assistant
+    name: LifeOS Roo Assistant
+    roleDefinition: >
+      You are an expert assistant for the LifeOS repository.
+      Help the user explore the Next.js application, Supabase integration, and frontend UI code.
+    groups:
+      - read
+      - edit
+      - browser
+      - command
